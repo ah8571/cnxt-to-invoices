@@ -685,6 +685,280 @@ async function exportInvoicePdf() {
   }
 }
 
+// Direct jsPDF renderer (no html2canvas). Used on mobile because html2canvas
+// produces blank canvases on iOS Safari and Chrome mobile. Output is fully
+// clean (no browser headers/footers) and identical across devices.
+async function exportInvoicePdfDirect() {
+  const jspdfNs = window.jspdf || (window.html2pdf && window.html2pdf.jsPDF ? { jsPDF: window.html2pdf.jsPDF } : null);
+  const JsPDFCtor = jspdfNs && jspdfNs.jsPDF;
+  if (typeof JsPDFCtor !== "function") {
+    saveStatus.textContent = "PDF export is unavailable right now. Please try again.";
+    return false;
+  }
+
+  saveStatus.textContent = "Preparing PDF...";
+
+  try {
+    const doc = new JsPDFCtor({ unit: "in", format: "letter", orientation: "portrait" });
+    const pageWidth = 8.5;
+    const pageHeight = 11;
+    const margin = 0.5;
+    const contentWidth = pageWidth - margin * 2;
+    const totals = calculateTotals();
+    const items = state.items;
+    const invoiceNumber = String(getDisplayInvoiceNumber() || "");
+
+    let cursorY = margin;
+
+    // ---- Header band: logo + business identity (left), invoice meta (right)
+    const headerTop = cursorY;
+    let leftX = margin;
+    let leftTextX = margin;
+
+    if (state.logoDataUrl) {
+      try {
+        const logoSize = 0.9;
+        doc.addImage(state.logoDataUrl, "PNG", margin, headerTop, logoSize, logoSize, undefined, "FAST");
+        leftTextX = margin + logoSize + 0.18;
+      } catch {
+        // ignore unsupported image format
+      }
+    }
+
+    doc.setTextColor(80, 80, 80);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text("INVOICE", leftTextX, headerTop + 0.18);
+
+    doc.setTextColor(20, 20, 20);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text(state.businessName || "Business name", leftTextX, headerTop + 0.45);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9.5);
+    doc.setTextColor(70, 70, 70);
+    let metaLineY = headerTop + 0.7;
+    [state.businessEmail, state.businessPhone, state.businessWebsite]
+      .filter((v) => v && String(v).trim().length > 0)
+      .forEach((line) => {
+        doc.text(String(line), leftTextX, metaLineY);
+        metaLineY += 0.18;
+      });
+
+    // Right-side meta
+    const rightX = pageWidth - margin;
+    doc.setTextColor(20, 20, 20);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    if (invoiceNumber) {
+      doc.text(invoiceNumber, rightX, headerTop + 0.18, { align: "right" });
+    }
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9.5);
+    doc.setTextColor(70, 70, 70);
+    let rightMetaY = headerTop + 0.42;
+    if (state.issueDate) {
+      doc.text(`Issued ${state.issueDate}`, rightX, rightMetaY, { align: "right" });
+      rightMetaY += 0.2;
+    }
+    if (state.dueDate) {
+      doc.text(`Due ${state.dueDate}`, rightX, rightMetaY, { align: "right" });
+      rightMetaY += 0.2;
+    }
+
+    cursorY = Math.max(metaLineY, rightMetaY, headerTop + 1.0) + 0.05;
+
+    // Divider
+    doc.setDrawColor(220, 215, 205);
+    doc.setLineWidth(0.01);
+    doc.line(margin, cursorY, pageWidth - margin, cursorY);
+    cursorY += 0.25;
+
+    // ---- From / Bill To columns
+    const colGap = 0.4;
+    const colWidth = (contentWidth - colGap) / 2;
+    const fromX = margin;
+    const billX = margin + colWidth + colGap;
+    const colTop = cursorY;
+
+    const drawColumn = (x, label, lines) => {
+      let y = colTop;
+      doc.setTextColor(120, 115, 105);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      doc.text(label.toUpperCase(), x, y);
+      y += 0.2;
+      doc.setTextColor(20, 20, 20);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.5);
+      doc.text(lines[0] || "", x, y);
+      y += 0.2;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(70, 70, 70);
+      for (let i = 1; i < lines.length; i++) {
+        const wrapped = doc.splitTextToSize(lines[i], colWidth);
+        wrapped.forEach((seg) => {
+          doc.text(seg, x, y);
+          y += 0.18;
+        });
+      }
+      return y;
+    };
+
+    const fromLines = [
+      state.businessName || "",
+      ...((state.businessAddress || "").split("\n").filter(Boolean)),
+    ];
+    const billLines = [
+      state.clientName || "",
+      ...(state.clientEmail ? [state.clientEmail] : []),
+      ...((state.clientAddress || "").split("\n").filter(Boolean)),
+    ];
+
+    const fromBottom = drawColumn(fromX, "From", fromLines);
+    const billBottom = drawColumn(billX, "Bill To", billLines);
+    cursorY = Math.max(fromBottom, billBottom) + 0.2;
+
+    // ---- Line items table
+    const colDescW = contentWidth * 0.5;
+    const colQtyW = contentWidth * 0.12;
+    const colRateW = contentWidth * 0.18;
+    const colAmtW = contentWidth * 0.2;
+    const colDescX = margin;
+    const colQtyX = colDescX + colDescW;
+    const colRateX = colQtyX + colQtyW;
+    const colAmtX = colRateX + colRateW;
+    const colAmtRightX = margin + contentWidth;
+
+    // Header row
+    doc.setFillColor(245, 240, 232);
+    doc.rect(margin, cursorY, contentWidth, 0.32, "F");
+    doc.setTextColor(80, 75, 65);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text("Description", colDescX + 0.1, cursorY + 0.21);
+    doc.text("Qty", colQtyX + colQtyW - 0.1, cursorY + 0.21, { align: "right" });
+    doc.text("Rate", colRateX + colRateW - 0.1, cursorY + 0.21, { align: "right" });
+    doc.text("Amount", colAmtRightX - 0.1, cursorY + 0.21, { align: "right" });
+    cursorY += 0.42;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(30, 30, 30);
+
+    const ensureSpace = (needed) => {
+      if (cursorY + needed > pageHeight - margin - 0.5) {
+        doc.addPage();
+        cursorY = margin;
+      }
+    };
+
+    if (items.length === 0) {
+      doc.setTextColor(140, 135, 125);
+      doc.text("No line items.", colDescX + 0.1, cursorY + 0.05);
+      cursorY += 0.3;
+    } else {
+      items.forEach((item) => {
+        const qty = Number(item.quantity || 0);
+        const rate = Number(item.rate || 0);
+        const lineTotal = qty * rate;
+        const descLines = doc.splitTextToSize(item.description || "", colDescW - 0.2);
+        const rowHeight = Math.max(0.28, descLines.length * 0.18 + 0.1);
+        ensureSpace(rowHeight + 0.1);
+
+        const textTop = cursorY + 0.12;
+        doc.setTextColor(30, 30, 30);
+        doc.setFont("helvetica", "normal");
+        descLines.forEach((seg, idx) => {
+          doc.text(seg, colDescX + 0.1, textTop + idx * 0.18);
+        });
+        doc.text(String(qty), colQtyX + colQtyW - 0.1, textTop, { align: "right" });
+        doc.text(formatCurrency(rate), colRateX + colRateW - 0.1, textTop, { align: "right" });
+        doc.text(formatCurrency(lineTotal), colAmtRightX - 0.1, textTop, { align: "right" });
+
+        cursorY += rowHeight;
+        doc.setDrawColor(235, 230, 220);
+        doc.setLineWidth(0.005);
+        doc.line(margin, cursorY, pageWidth - margin, cursorY);
+      });
+    }
+
+    cursorY += 0.25;
+
+    // ---- Summary block (right-aligned)
+    ensureSpace(1.2);
+    const summaryLabelX = pageWidth - margin - 1.6;
+    const summaryValueX = pageWidth - margin;
+    const drawSummaryRow = (label, value, opts = {}) => {
+      doc.setFont("helvetica", opts.bold ? "bold" : "normal");
+      doc.setFontSize(opts.large ? 12 : 10);
+      doc.setTextColor(opts.bold ? 20 : 70, opts.bold ? 20 : 70, opts.bold ? 20 : 70);
+      doc.text(label, summaryLabelX, cursorY);
+      doc.text(value, summaryValueX, cursorY, { align: "right" });
+      cursorY += opts.large ? 0.3 : 0.24;
+    };
+
+    drawSummaryRow("Subtotal", formatCurrency(totals.subtotal));
+    if (totals.tax > 0) drawSummaryRow("Tax", formatCurrency(totals.tax));
+    if (totals.discount > 0) drawSummaryRow("Discount", `-${formatCurrency(totals.discount)}`);
+
+    doc.setDrawColor(200, 195, 185);
+    doc.setLineWidth(0.01);
+    doc.line(summaryLabelX, cursorY - 0.05, summaryValueX, cursorY - 0.05);
+    cursorY += 0.05;
+    drawSummaryRow("Total", formatCurrency(totals.total), { bold: true, large: true });
+
+    cursorY += 0.2;
+
+    // ---- Notes
+    if (state.notes && state.notes.trim().length > 0) {
+      ensureSpace(0.6);
+      doc.setTextColor(120, 115, 105);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      doc.text("NOTES", margin, cursorY);
+      cursorY += 0.2;
+      doc.setTextColor(50, 50, 50);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      const noteLines = doc.splitTextToSize(state.notes, contentWidth);
+      noteLines.forEach((line) => {
+        ensureSpace(0.2);
+        doc.text(line, margin, cursorY);
+        cursorY += 0.18;
+      });
+    }
+
+    // ---- Footer on every page
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let p = 1; p <= pageCount; p++) {
+      doc.setPage(p);
+      doc.setDrawColor(230, 225, 215);
+      doc.setLineWidth(0.005);
+      doc.line(margin, pageHeight - margin - 0.25, pageWidth - margin, pageHeight - margin - 0.25);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(140, 135, 125);
+      doc.text("Free Invoice Maker | cnxt to invoices", margin, pageHeight - margin - 0.05);
+      if (invoiceNumber) {
+        doc.text(invoiceNumber, pageWidth - margin, pageHeight - margin - 0.05, { align: "right" });
+      }
+    }
+
+    const fileName = getPdfFileName();
+    const pdfBlob = doc.output("blob");
+    const deliveryResult = await deliverPdfBlob(pdfBlob, fileName, { preferDownload: true });
+    saveStatus.textContent = deliveryResult === "downloaded" ? "PDF downloaded." : "PDF ready.";
+    return true;
+  } catch (err) {
+    console.error("Direct PDF render failed", err);
+    saveStatus.textContent = "Unable to generate PDF.";
+    return false;
+  }
+}
+
 async function resumePostAuthDraftFlow() {
   const pendingAction = localStorage.getItem(POST_AUTH_ACTION_KEY);
   if (!pendingAction || !isSupabaseConfigured()) {
@@ -1141,6 +1415,12 @@ async function handlePrintInvoice() {
     if (saveStatus.textContent === "Add a business name before saving the invoice." || saveStatus.textContent === "Add at least one line item before saving the invoice.") {
       return;
     }
+  }
+
+  if (isMobilePdfExport()) {
+    const ok = await exportInvoicePdfDirect();
+    if (ok) return;
+    // fall through to html2pdf only if direct renderer failed to load jsPDF
   }
 
   await exportInvoicePdf();
