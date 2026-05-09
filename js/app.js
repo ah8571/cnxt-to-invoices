@@ -540,9 +540,33 @@ function isMobilePdfExport() {
   return Boolean(mobileUserAgent || smallViewport);
 }
 
-async function deliverPdfBlob(blob, fileName) {
+function triggerPdfDownload(blob, fileName) {
+  const blobUrl = URL.createObjectURL(blob);
+  const downloadLink = document.createElement("a");
+
+  downloadLink.href = blobUrl;
+  downloadLink.download = fileName;
+  downloadLink.rel = "noopener";
+  downloadLink.style.display = "none";
+  document.body.appendChild(downloadLink);
+  downloadLink.click();
+  downloadLink.remove();
+
+  window.setTimeout(() => {
+    URL.revokeObjectURL(blobUrl);
+  }, 60_000);
+}
+
+async function deliverPdfBlob(blob, fileName, options = {}) {
   if (!(blob instanceof Blob)) {
     throw new Error("Unable to prepare PDF file.");
+  }
+
+  const { preferDownload = false } = options;
+
+  if (preferDownload) {
+    triggerPdfDownload(blob, fileName);
+    return "downloaded";
   }
 
   if (typeof File === "function" && navigator.share) {
@@ -630,10 +654,12 @@ async function exportInvoicePdf() {
     if (isMobileExport) {
       await pdfWorker.toPdf();
       const pdfBlob = await pdfWorker.outputPdf("blob");
-      const deliveryResult = await deliverPdfBlob(pdfBlob, fileName);
-      saveStatus.textContent = deliveryResult === "shared"
-        ? "PDF ready to share."
-        : "PDF opened in a new tab.";
+      const deliveryResult = await deliverPdfBlob(pdfBlob, fileName, { preferDownload: true });
+      saveStatus.textContent = deliveryResult === "downloaded"
+        ? "PDF downloaded."
+        : deliveryResult === "shared"
+          ? "PDF ready to share."
+          : "PDF opened in a new tab.";
     } else {
       await pdfWorker.save();
       saveStatus.textContent = "PDF downloaded.";
