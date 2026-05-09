@@ -775,14 +775,12 @@ async function exportInvoicePdfDirect() {
     doc.line(margin, cursorY, pageWidth - margin, cursorY);
     cursorY += 0.25;
 
-    // ---- From / Bill To columns
-    const colGap = 0.4;
-    const colWidth = (contentWidth - colGap) / 2;
-    const fromX = margin;
-    const billX = margin + colWidth + colGap;
+    // ---- Bill To column (single column; "From" is already shown in header)
     const colTop = cursorY;
+    const billX = margin;
+    const billColWidth = contentWidth * 0.6;
 
-    const drawColumn = (x, label, lines) => {
+    const drawColumn = (x, label, lines, width) => {
       let y = colTop;
       doc.setTextColor(120, 115, 105);
       doc.setFont("helvetica", "bold");
@@ -798,7 +796,7 @@ async function exportInvoicePdfDirect() {
       doc.setFontSize(9.5);
       doc.setTextColor(70, 70, 70);
       for (let i = 1; i < lines.length; i++) {
-        const wrapped = doc.splitTextToSize(lines[i], colWidth);
+        const wrapped = doc.splitTextToSize(lines[i], width);
         wrapped.forEach((seg) => {
           doc.text(seg, x, y);
           y += 0.18;
@@ -807,19 +805,14 @@ async function exportInvoicePdfDirect() {
       return y;
     };
 
-    const fromLines = [
-      state.businessName || "",
-      ...((state.businessAddress || "").split("\n").filter(Boolean)),
-    ];
     const billLines = [
       state.clientName || "",
       ...(state.clientEmail ? [state.clientEmail] : []),
       ...((state.clientAddress || "").split("\n").filter(Boolean)),
     ];
 
-    const fromBottom = drawColumn(fromX, "From", fromLines);
-    const billBottom = drawColumn(billX, "Bill To", billLines);
-    cursorY = Math.max(fromBottom, billBottom) + 0.2;
+    const billBottom = drawColumn(billX, "Bill To", billLines, billColWidth);
+    cursorY = billBottom + 0.2;
 
     // ---- Line items table
     const colDescW = contentWidth * 0.5;
@@ -1238,6 +1231,7 @@ function renderLineItems() {
     function updateLineItemRow(message) {
       totalInput.value = formatCurrency(Number(state.items[index].quantity) * Number(state.items[index].rate));
       persistStateSilently();
+      renderPreview();
     }
 
     function commitLineItemRow(message) {
@@ -1353,11 +1347,6 @@ function renderPreview() {
     </div>
 
     <div class="preview-columns">
-      <div>
-        <p class="eyebrow">From</p>
-        <p><strong>${businessName}</strong></p>
-        <p>${formatMultiline(state.businessAddress)}</p>
-      </div>
       <div>
         <p class="eyebrow">Bill To</p>
         <p><strong>${clientName}</strong></p>
