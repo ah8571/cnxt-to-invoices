@@ -689,7 +689,7 @@ textarea:focus {
 }
 
 .invoice-preview {
-  background: var(--paper);
+  background: #fff;
   border-radius: 20px;
   padding: 36px;
   min-height: 900px;
