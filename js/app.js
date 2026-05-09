@@ -759,11 +759,11 @@ async function exportInvoicePdfDirect() {
     doc.setTextColor(70, 70, 70);
     let rightMetaY = headerTop + 0.22;
     if (state.issueDate) {
-      doc.text(`Issued ${state.issueDate}`, rightX, rightMetaY, { align: "right" });
+      doc.text(`Issued ${formatDateUS(state.issueDate)}`, rightX, rightMetaY, { align: "right" });
       rightMetaY += 0.2;
     }
     if (state.dueDate) {
-      doc.text(`Due ${state.dueDate}`, rightX, rightMetaY, { align: "right" });
+      doc.text(`Due ${formatDateUS(state.dueDate)}`, rightX, rightMetaY, { align: "right" });
       rightMetaY += 0.2;
     }
 
@@ -775,22 +775,22 @@ async function exportInvoicePdfDirect() {
     doc.line(margin, cursorY, pageWidth - margin, cursorY);
     cursorY += 0.25;
 
-    // ---- Bill To column (single column; "From" is already shown in header)
+    // ---- Bill To column (right-aligned; "From" is already shown in header)
     const colTop = cursorY;
-    const billX = margin;
     const billColWidth = contentWidth * 0.6;
+    const billRightX = pageWidth - margin;
 
-    const drawColumn = (x, label, lines, width) => {
+    const drawColumnRight = (rightEdgeX, label, lines, width) => {
       let y = colTop;
       doc.setTextColor(120, 115, 105);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(7.5);
-      doc.text(label.toUpperCase(), x, y);
+      doc.text(label.toUpperCase(), rightEdgeX, y, { align: "right" });
       y += 0.2;
       doc.setTextColor(20, 20, 20);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10.5);
-      doc.text(lines[0] || "", x, y);
+      doc.text(lines[0] || "", rightEdgeX, y, { align: "right" });
       y += 0.2;
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9.5);
@@ -798,7 +798,7 @@ async function exportInvoicePdfDirect() {
       for (let i = 1; i < lines.length; i++) {
         const wrapped = doc.splitTextToSize(lines[i], width);
         wrapped.forEach((seg) => {
-          doc.text(seg, x, y);
+          doc.text(seg, rightEdgeX, y, { align: "right" });
           y += 0.18;
         });
       }
@@ -811,7 +811,7 @@ async function exportInvoicePdfDirect() {
       ...((state.clientAddress || "").split("\n").filter(Boolean)),
     ];
 
-    const billBottom = drawColumn(billX, "Bill To", billLines, billColWidth);
+    const billBottom = drawColumnRight(billRightX, "Bill To", billLines, billColWidth);
     cursorY = billBottom + 0.2;
 
     // ---- Line items table
@@ -1179,6 +1179,14 @@ async function refreshWorkspace() {
   }
 }
 
+function formatDateUS(value) {
+  if (!value) return "";
+  const s = String(value).trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (m) return `${m[2]}/${m[3]}/${m[1]}`;
+  return s;
+}
+
 function formatCurrency(value) {
   const symbol = currencySymbols[state.currency] || `${state.currency} `;
   return `${symbol}${value.toFixed(2)}`;
@@ -1309,8 +1317,8 @@ function renderPreview() {
   const businessName = escapeHtml(state.businessName || "");
   const clientName = escapeHtml(state.clientName || "");
   const invoiceNumber = escapeHtml(getDisplayInvoiceNumber());
-  const issueDate = escapeHtml(state.issueDate || "");
-  const dueDate = escapeHtml(state.dueDate || "");
+  const issueDate = escapeHtml(formatDateUS(state.issueDate));
+  const dueDate = escapeHtml(formatDateUS(state.dueDate));
   const businessEmail = state.businessEmail ? `<p>${escapeHtml(state.businessEmail)}</p>` : "";
   const businessPhone = state.businessPhone ? `<p>${escapeHtml(state.businessPhone)}</p>` : "";
   const businessWebsite = state.businessWebsite ? `<p>${escapeHtml(state.businessWebsite)}</p>` : "";
@@ -1347,7 +1355,7 @@ function renderPreview() {
     </div>
 
     <div class="preview-columns">
-      <div>
+      <div style="text-align:right; margin-left:auto;">
         <p class="eyebrow">Bill To</p>
         <p><strong>${clientName}</strong></p>
         ${clientEmail}
