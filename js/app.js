@@ -1136,22 +1136,6 @@ function sync(message) {
 async function handlePrintInvoice() {
   renderPreview();
 
-  if (isMobilePdfExport()) {
-    if (!state.businessName.trim()) {
-      saveStatus.textContent = "Add a business name before saving the invoice.";
-      return;
-    }
-
-    if (getMeaningfulItems().length === 0) {
-      saveStatus.textContent = "Add at least one line item before saving the invoice.";
-      return;
-    }
-
-    saveStatus.textContent = "Opening print dialog...";
-    window.print();
-    return;
-  }
-
   if (isSupabaseConfigured()) {
     await saveInvoiceRecord();
     if (saveStatus.textContent === "Add a business name before saving the invoice." || saveStatus.textContent === "Add at least one line item before saving the invoice.") {
@@ -1251,11 +1235,6 @@ if (saveDraftButton) {
 }
 
 if (printBottomButton) {
-  if (isMobilePdfExport()) {
-    printBottomButton.textContent = "Print / Save PDF";
-    printBottomButton.setAttribute("aria-label", "Print or save PDF");
-  }
-
   printBottomButton.addEventListener("click", () => {
     handlePrintInvoice();
   });
