@@ -534,6 +534,42 @@ function getPdfFileName() {
   return `${safeInvoiceNumber || "invoice"}.pdf`;
 }
 
+function isMobilePdfExport() {
+  const mobileUserAgent = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
+  const smallViewport = window.matchMedia?.("(max-width: 900px)")?.matches;
+  return Boolean(mobileUserAgent || smallViewport);
+}
+
+async function deliverPdfBlob(blob, fileName) {
+  if (!(blob instanceof Blob)) {
+    throw new Error("Unable to prepare PDF file.");
+  }
+
+  if (typeof File === "function" && navigator.share) {
+    const shareFile = new File([blob], fileName, { type: "application/pdf" });
+    if (!navigator.canShare || navigator.canShare({ files: [shareFile] })) {
+      await navigator.share({
+        files: [shareFile],
+        title: fileName,
+      });
+      return "shared";
+    }
+  }
+
+  const blobUrl = URL.createObjectURL(blob);
+  const openedWindow = window.open(blobUrl, "_blank", "noopener");
+
+  if (!openedWindow) {
+    window.location.href = blobUrl;
+  }
+
+  window.setTimeout(() => {
+    URL.revokeObjectURL(blobUrl);
+  }, 60_000);
+
+  return "opened";
+}
+
 async function exportInvoicePdf() {
   if (!preview) {
     return;
@@ -564,13 +600,19 @@ async function exportInvoicePdf() {
   saveStatus.textContent = "Preparing PDF...";
 
   try {
-    await html2pdf()
+    const isMobileExport = isMobilePdfExport();
+    const fileName = getPdfFileName();
+    const renderScale = isMobileExport
+      ? Math.min(window.devicePixelRatio || 1, 1.25)
+      : 2;
+
+    const pdfWorker = html2pdf()
       .set({
-        filename: getPdfFileName(),
+        filename: fileName,
         margin: [0.35, 0.35, 0.35, 0.35],
         image: { type: "jpeg", quality: 0.98 },
         html2canvas: {
-          scale: 2,
+          scale: renderScale,
           useCORS: true,
           backgroundColor: "#ffffff",
         },
@@ -583,10 +625,19 @@ async function exportInvoicePdf() {
           mode: ["css", "legacy"],
         },
       })
-      .from(exportNode)
-      .save();
+      .from(exportNode);
 
-    saveStatus.textContent = "PDF downloaded.";
+    if (isMobileExport) {
+      await pdfWorker.toPdf();
+      const pdfBlob = await pdfWorker.outputPdf("blob");
+      const deliveryResult = await deliverPdfBlob(pdfBlob, fileName);
+      saveStatus.textContent = deliveryResult === "shared"
+        ? "PDF ready to share."
+        : "PDF opened in a new tab.";
+    } else {
+      await pdfWorker.save();
+      saveStatus.textContent = "PDF downloaded.";
+    }
   } catch {
     saveStatus.textContent = "Unable to generate PDF.";
   } finally {
