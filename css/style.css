@@ -514,7 +514,7 @@ textarea:focus {
 
 .line-item-row {
   display: grid;
-  grid-template-columns: minmax(160px, 2.2fr) repeat(3, minmax(90px, 1fr)) 48px;
+  grid-template-columns: minmax(0, 2.2fr) repeat(3, minmax(0, 1fr)) 40px;
   gap: 10px;
   align-items: end;
   padding: 14px;
@@ -523,9 +523,14 @@ textarea:focus {
   background: rgba(255, 255, 255, 0.54);
 }
 
+.line-item-row label,
+.line-item-row input {
+  min-width: 0;
+}
+
 .remove-item {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   border-radius: 999px;
   justify-self: end;
