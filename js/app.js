@@ -94,6 +94,10 @@ function saveState(message = "Draft stored in your browser.") {
   saveStatus.textContent = message;
 }
 
+function persistStateSilently() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
 function normalizeItems(items) {
   if (!Array.isArray(items) || items.length === 0) {
     return [{ description: "", quantity: 1, rate: 0 }];
@@ -868,7 +872,7 @@ function renderLineItems() {
 
     function updateLineItemRow(message) {
       totalInput.value = formatCurrency(Number(state.items[index].quantity) * Number(state.items[index].rate));
-      saveState(message);
+      persistStateSilently();
     }
 
     function commitLineItemRow(message) {

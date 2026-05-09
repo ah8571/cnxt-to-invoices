@@ -202,6 +202,7 @@ a {
 }
 
 .site-footer-link {
+  display: block;
   color: var(--accent);
   font-size: 0.95rem;
   width: fit-content;
@@ -896,6 +897,19 @@ textarea:focus {
 
   .site-footer-grid {
     grid-template-columns: 1fr;
+  }
+
+  .site-footer {
+    margin-top: 44px;
+    padding-top: 28px;
+  }
+
+  .site-footer-links {
+    gap: 12px;
+  }
+
+  .site-footer-bottom {
+    margin-top: 28px;
   }
 }
 
