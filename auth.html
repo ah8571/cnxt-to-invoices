@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cnxt to invoices auth</title>
+    <link rel="stylesheet" href="./css/style.css" />
+  </head>
+  <body>
+    <div class="page-shell page-shell-auth">
+      <header class="hero hero-auth">
+        <div>
+          <p class="eyebrow">cnxt to invoices</p>
+          <h1>Sign in or create an account to save invoice details later.</h1>
+          <p class="lede">Create an account or sign in to save your business details for future invoices.</p>
+        </div>
+        <div class="hero-actions">
+          <a class="button" href="./index.html">Back to generator</a>
+        </div>
+      </header>
+
+      <main class="auth-layout">
+        <section class="panel auth-panel">
+          <div class="form-section auth-section-first">
+            <div class="section-heading">
+              <h2>Account</h2>
+              <p>Use your email and password to access saved invoice information.</p>
+            </div>
+            <div class="auth-tabs" role="tablist" aria-label="Authentication tabs">
+              <button id="show-sign-in" class="auth-tab auth-tab-active" type="button">Sign in</button>
+              <button id="show-sign-up" class="auth-tab" type="button">Sign up</button>
+            </div>
+
+            <form id="sign-in-form" class="stack-form auth-form">
+              <label>
+                Email
+                <input name="email" type="email" placeholder="you@example.com" required />
+              </label>
+              <label>
+                Password
+                <input name="password" type="password" placeholder="Minimum 6 characters" required />
+              </label>
+              <button class="button" type="submit">Sign in</button>
+            </form>
+
+            <form id="sign-up-form" class="stack-form auth-form auth-form-hidden">
+              <label>
+                Email
+                <input name="email" type="email" placeholder="you@example.com" required />
+              </label>
+              <label>
+                Password
+                <input name="password" type="password" placeholder="Minimum 6 characters" required />
+              </label>
+              <label>
+                Confirm password
+                <input name="confirmPassword" type="password" placeholder="Repeat password" required />
+              </label>
+              <button class="button" type="submit">Create account</button>
+            </form>
+            <p id="auth-feedback" class="auth-feedback" aria-live="polite"></p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="./js/auth.js"></script>
+  </body>
+</html>

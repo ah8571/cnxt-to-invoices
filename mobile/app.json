@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "cnxt to invoices",
+    "slug": "cnxt-to-invoice-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ]
+  }
+}

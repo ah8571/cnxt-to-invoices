@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Free Invoice Maker | cnxt to invoices</title>
+    <meta
+      name="description"
+      content="Free invoice maker by cnxt to invoices. Create invoices, save drafts, and print or save professional invoices at no cost."
+    />
+    <link rel="stylesheet" href="./css/style.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">cnxt to invoices</p>
+          <h1>Free invoice generator with a clean print-ready layout.</h1>
+          <p class="lede">
+            Fill out the form, preview the invoice instantly, then print or save.
+          </p>
+        </div>
+        <div class="hero-actions">
+          <div class="menu-shell">
+            <button id="menu-toggle" class="button button-secondary menu-toggle" type="button" aria-expanded="false" aria-controls="app-menu">Menu</button>
+            <div id="app-menu" class="app-menu hidden">
+              <a class="app-menu-item app-menu-link" href="./index.html">Create invoice</a>
+              <a class="app-menu-item app-menu-link" href="./drafts.html">Drafts</a>
+              <a class="app-menu-item app-menu-link" href="./invoices.html">Previous invoices</a>
+              <a class="app-menu-item app-menu-link" href="./auth.html">Sign in / Sign up</a>
+            </div>
+          </div>
+          <button id="print-invoice" class="button" type="button">Print / Save PDF</button>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="panel panel-form">
+          <form id="invoice-form">
+            <div class="form-section">
+              <div class="section-heading">
+                <h2>Business</h2>
+                <p>Your business details.</p>
+              </div>
+              <div class="button-row section-actions">
+                <button id="save-business-profile" class="button" type="button">Save business info</button>
+              </div>
+              <div class="field-grid two-up">
+                <label>
+                  Business name
+                  <input name="businessName" type="text" />
+                </label>
+                <label>
+                  Email
+                  <input name="businessEmail" type="email" />
+                </label>
+                <label>
+                  Phone
+                  <input name="businessPhone" type="text" />
+                </label>
+                <label>
+                  Website
+                  <input name="businessWebsite" type="text" />
+                </label>
+              </div>
+              <div class="field-grid logo-grid">
+                <label>
+                  Logo
+                  <input id="logo-input" type="file" accept="image/*" />
+                </label>
+                <div class="logo-actions">
+                  <p class="field-note">Optional. Stored only in this browser for now.</p>
+                  <button id="clear-logo" class="button button-ghost" type="button">Remove logo</button>
+                </div>
+              </div>
+              <label>
+                Address
+                <textarea name="businessAddress" rows="2"></textarea>
+              </label>
+            </div>
+
+            <div class="form-section">
+              <div class="section-heading">
+                <h2>Client</h2>
+                <p>Who the invoice is for.</p>
+              </div>
+              <div class="field-grid two-up">
+                <label>
+                  Client name
+                  <input name="clientName" type="text" />
+                </label>
+                <label>
+                  Client email
+                  <input name="clientEmail" type="email" />
+                </label>
+              </div>
+              <label>
+                Client address
+                <textarea name="clientAddress" rows="2"></textarea>
+              </label>
+            </div>
+
+            <div class="form-section">
+              <div class="section-heading">
+                <h2>Invoice</h2>
+                <p>Core invoice details.</p>
+              </div>
+              <div class="field-grid three-up">
+                <label>
+                  Invoice number
+                  <input name="invoiceNumber" type="text" />
+                </label>
+                <label>
+                  Issue date
+                  <input name="issueDate" type="date" />
+                </label>
+                <label>
+                  Due date
+                  <input name="dueDate" type="date" />
+                </label>
+                <label>
+                  Currency
+                  <select name="currency">
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                    <option value="CAD">CAD</option>
+                  </select>
+                </label>
+                <label>
+                  Tax rate %
+                  <input name="taxRate" type="number" min="0" step="0.01" placeholder="0" />
+                </label>
+                <label>
+                  Discount
+                  <input name="discount" type="number" min="0" step="0.01" placeholder="0" />
+                </label>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="section-heading section-heading-inline">
+                <div>
+                  <h2>Line items</h2>
+                  <p>Add the work or products being billed.</p>
+                </div>
+                <button id="add-item" class="button button-secondary" type="button">Add new item</button>
+              </div>
+              <div id="line-items" class="line-items"></div>
+            </div>
+
+            <div class="form-section">
+              <div class="section-heading">
+                <h2>Notes</h2>
+                <p>Optional payment or project notes.</p>
+              </div>
+              <label>
+                Notes
+                <textarea name="notes" rows="4"></textarea>
+              </label>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel panel-preview">
+          <div class="preview-toolbar">
+            <div>
+              <span>Live preview</span>
+              <span id="save-status" class="save-status">Draft stored in your browser.</span>
+            </div>
+            <div class="button-row preview-toolbar-actions">
+              <button id="save-draft" class="button button-secondary" type="button">Save draft</button>
+              <button id="print-invoice-bottom" class="button" type="button">Print / Save invoice</button>
+            </div>
+          </div>
+          <article id="invoice-preview" class="invoice-preview"></article>
+        </section>
+      </main>
+    </div>
+
+    <template id="line-item-template">
+      <div class="line-item-row">
+        <label>
+          Description
+          <input data-field="description" type="text" />
+        </label>
+        <label>
+          Qty
+          <input data-field="quantity" type="number" min="0" step="0.01" value="1" />
+        </label>
+        <label>
+          Rate
+          <input data-field="rate" type="number" min="0" step="0.01" value="0" />
+        </label>
+        <label>
+          Total
+          <input data-field="total" type="text" value="$0.00" disabled />
+        </label>
+        <button class="button button-ghost remove-item" type="button">Remove</button>
+      </div>
+    </template>
+
+    <script type="module" src="./js/app.js"></script>
+  </body>
+</html>

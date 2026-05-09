@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Saved Drafts | cnxt to invoices</title>
+    <link rel="stylesheet" href="./css/style.css" />
+  </head>
+  <body data-workspace-kind="drafts">
+    <div class="page-shell workspace-page-shell">
+      <header class="hero hero-auth">
+        <div>
+          <p class="eyebrow">cnxt to invoices</p>
+          <h1>Saved drafts</h1>
+          <p class="lede">Open a saved draft to continue editing it inside the invoice maker.</p>
+        </div>
+        <div class="hero-actions">
+          <a class="button button-secondary" href="./index.html">Back to generator</a>
+          <a class="button" href="./auth.html">Sign in / Sign up</a>
+        </div>
+      </header>
+
+      <nav class="workspace-page-nav" aria-label="Saved invoice pages">
+        <a class="workspace-page-link workspace-page-link-active" href="./drafts.html">Drafts</a>
+        <a class="workspace-page-link" href="./invoices.html">Previous invoices</a>
+      </nav>
+
+      <main>
+        <section class="panel panel-workspace workspace-panel-page">
+          <div class="workspace-header">
+            <div>
+              <p class="eyebrow">Draft library</p>
+              <h2>Continue a saved draft</h2>
+              <p id="workspace-subtitle" class="lede workspace-lede">Sign in to access drafts saved to your account.</p>
+            </div>
+            <button id="refresh-workspace" class="button button-secondary" type="button">Refresh</button>
+          </div>
+          <div id="workspace-list" class="workspace-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="./js/workspace.js"></script>
+  </body>
+</html>
