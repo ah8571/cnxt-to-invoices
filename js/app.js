@@ -706,9 +706,9 @@ async function exportInvoicePdfDirect() {
 
   try {
     const doc = new JsPDFCtor({ unit: "in", format: "letter", orientation: "portrait" });
-    const pageWidth = 8.5;
-    const pageHeight = 11;
-    const margin = 0.5;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 0.6;
     const contentWidth = pageWidth - margin * 2;
     const totals = calculateTotals();
     const items = state.items;
@@ -752,18 +752,12 @@ async function exportInvoicePdfDirect() {
         metaLineY += 0.18;
       });
 
-    // Right-side meta
+    // Right-side meta (issue/due dates only; invoice number is shown in footer)
     const rightX = pageWidth - margin;
-    doc.setTextColor(20, 20, 20);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    if (invoiceNumber) {
-      doc.text(invoiceNumber, rightX, headerTop + 0.18, { align: "right" });
-    }
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9.5);
     doc.setTextColor(70, 70, 70);
-    let rightMetaY = headerTop + 0.42;
+    let rightMetaY = headerTop + 0.22;
     if (state.issueDate) {
       doc.text(`Issued ${state.issueDate}`, rightX, rightMetaY, { align: "right" });
       rightMetaY += 0.2;
@@ -948,9 +942,6 @@ async function exportInvoicePdfDirect() {
       doc.setFontSize(8);
       doc.setTextColor(140, 135, 125);
       doc.text("Free Invoice Maker | cnxt to invoices", margin, pageHeight - margin - 0.05);
-      if (invoiceNumber) {
-        doc.text(invoiceNumber, pageWidth - margin, pageHeight - margin - 0.05, { align: "right" });
-      }
     }
 
     const fileName = getPdfFileName();
