@@ -802,6 +802,10 @@ function renderLineItems() {
 
     function updateLineItemRow(message) {
       totalInput.value = formatCurrency(Number(state.items[index].quantity) * Number(state.items[index].rate));
+      saveState(message);
+    }
+
+    function commitLineItemRow(message) {
       renderPreview();
       saveState(message);
     }
@@ -812,16 +816,28 @@ function renderLineItems() {
       updateLineItemRow();
     });
 
+    descriptionInput.addEventListener("blur", () => {
+      commitLineItemRow();
+    });
+
     quantityInput.addEventListener("input", (event) => {
       event.stopPropagation();
       state.items[index].quantity = Number(event.target.value) || 0;
       updateLineItemRow();
     });
 
+    quantityInput.addEventListener("blur", () => {
+      commitLineItemRow();
+    });
+
     rateInput.addEventListener("input", (event) => {
       event.stopPropagation();
       state.items[index].rate = Number(event.target.value) || 0;
       updateLineItemRow();
+    });
+
+    rateInput.addEventListener("blur", () => {
+      commitLineItemRow();
     });
 
     removeButton.addEventListener("click", () => {
@@ -1048,13 +1064,17 @@ if (invoicesTabButton) {
   invoicesTabButton.addEventListener("click", () => setWorkspaceTab("invoices"));
 }
 
-saveDraftButton.addEventListener("click", () => {
-  handleSaveDraft();
-});
+if (saveDraftButton) {
+  saveDraftButton.addEventListener("click", () => {
+    handleSaveDraft();
+  });
+}
 
-printBottomButton.addEventListener("click", () => {
-  handlePrintInvoice();
-});
+if (printBottomButton) {
+  printBottomButton.addEventListener("click", () => {
+    handlePrintInvoice();
+  });
+}
 
 populateForm();
 renderLineItems();
