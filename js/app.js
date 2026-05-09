@@ -11,7 +11,6 @@ const lineItemTemplate = document.querySelector("#line-item-template");
 const preview = document.querySelector("#invoice-preview");
 const saveStatus = document.querySelector("#save-status");
 const addItemButton = document.querySelector("#add-item");
-const printButton = document.querySelector("#print-invoice");
 const printBottomButton = document.querySelector("#print-invoice-bottom");
 const saveDraftButton = document.querySelector("#save-draft");
 const menuToggleButton = document.querySelector("#menu-toggle");
@@ -1034,10 +1033,6 @@ if (invoicesTabButton) {
 
 saveDraftButton.addEventListener("click", () => {
   handleSaveDraft();
-});
-
-printButton.addEventListener("click", () => {
-  saveInvoiceRecord({ printAfterSave: true });
 });
 
 printBottomButton.addEventListener("click", () => {
