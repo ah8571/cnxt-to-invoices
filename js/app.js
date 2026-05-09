@@ -613,11 +613,14 @@ async function exportInvoicePdf() {
 
   const exportShell = document.createElement("div");
   exportShell.style.position = "fixed";
-  exportShell.style.left = "-99999px";
+  exportShell.style.left = "0";
   exportShell.style.top = "0";
   exportShell.style.width = "816px";
   exportShell.style.padding = "0";
   exportShell.style.background = "#ffffff";
+  exportShell.style.opacity = "0";
+  exportShell.style.pointerEvents = "none";
+  exportShell.style.zIndex = "-1";
   exportShell.appendChild(exportNode);
 
   document.body.appendChild(exportShell);
