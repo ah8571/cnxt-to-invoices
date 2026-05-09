@@ -907,7 +907,7 @@ async function exportInvoicePdfDirect() {
     doc.setDrawColor(200, 195, 185);
     doc.setLineWidth(0.01);
     doc.line(summaryLabelX, cursorY - 0.05, summaryValueX, cursorY - 0.05);
-    cursorY += 0.05;
+    cursorY += 0.22;
     drawSummaryRow("Total", formatCurrency(totals.total), { bold: true, large: true });
 
     cursorY += 0.2;
@@ -942,6 +942,9 @@ async function exportInvoicePdfDirect() {
       doc.setFontSize(8);
       doc.setTextColor(140, 135, 125);
       doc.text("Free Invoice Maker | cnxt to invoices", margin, pageHeight - margin - 0.05);
+      if (invoiceNumber) {
+        doc.text(invoiceNumber, pageWidth - margin, pageHeight - margin - 0.05, { align: "right" });
+      }
     }
 
     const fileName = getPdfFileName();
