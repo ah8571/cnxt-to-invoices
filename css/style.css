@@ -661,6 +661,10 @@ textarea:focus {
   margin-top: 36px;
   padding-top: 18px;
   border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
 }
 
 .preview-invoice-number {
@@ -668,6 +672,13 @@ textarea:focus {
   color: var(--muted);
   font-size: 0.94rem;
   letter-spacing: 0.04em;
+}
+
+.preview-print-brand {
+  color: var(--accent);
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
 .empty-state {
@@ -720,6 +731,11 @@ textarea:focus {
     justify-content: stretch;
   }
 
+  .preview-footer {
+    flex-direction: column;
+    align-items: start;
+  }
+
   .workspace-tabs {
     display: flex;
     width: 100%;
@@ -738,8 +754,14 @@ textarea:focus {
 }
 
 @media print {
+  @page {
+    margin: 0.55in;
+  }
+
   body {
     background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   .hero,
@@ -758,5 +780,14 @@ textarea:focus {
     box-shadow: none;
     border: 0;
     background: #fff;
+  }
+
+  .invoice-preview {
+    min-height: auto;
+  }
+
+  .preview-footer {
+    margin-top: 44px;
+    page-break-inside: avoid;
   }
 }

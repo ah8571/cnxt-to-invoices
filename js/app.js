@@ -868,12 +868,11 @@ function renderPreview() {
   const businessPhone = state.businessPhone ? `<p>${escapeHtml(state.businessPhone)}</p>` : "";
   const businessWebsite = state.businessWebsite ? `<p>${escapeHtml(state.businessWebsite)}</p>` : "";
   const clientEmail = state.clientEmail ? `<p>${escapeHtml(state.clientEmail)}</p>` : "";
-  const invoiceFooterMarkup = invoiceNumber
-    ? `
+  const invoiceFooterMarkup = `
     <div class="preview-footer">
-      <p class="preview-invoice-number">${invoiceNumber}</p>
-    </div>`
-    : "";
+      <a class="preview-print-brand" href="https://invoices.cnxt.to/">Free Invoice Maker | cnxt to invoices</a>
+      ${invoiceNumber ? `<p class="preview-invoice-number">${invoiceNumber}</p>` : ""}
+    </div>`;
   const notesMarkup = state.notes.trim().length > 0
     ? `
     <div class="preview-notes">
