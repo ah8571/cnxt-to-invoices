@@ -605,38 +605,44 @@ async function exportInvoicePdf() {
     return;
   }
 
-  const exportNode = preview.cloneNode(true);
-  exportNode.style.minHeight = "auto";
-  exportNode.style.borderRadius = "0";
-  exportNode.style.boxShadow = "none";
-  exportNode.style.margin = "0";
-  exportNode.style.width = "816px";
-  exportNode.style.display = "block";
+  const isMobileExport = isMobilePdfExport();
+  const fileName = getPdfFileName();
+  const renderScale = isMobileExport ? 1 : 2;
 
-  const exportShell = document.createElement("div");
-  exportShell.style.position = "absolute";
-  exportShell.style.left = "-9999px";
-  exportShell.style.top = "0";
-  exportShell.style.width = "816px";
-  exportShell.style.padding = "0";
-  exportShell.style.background = "#ffffff";
-  exportShell.style.pointerEvents = "none";
-  exportShell.style.zIndex = "-1";
-  exportShell.appendChild(exportNode);
+  const exportNode = isMobileExport ? preview : preview.cloneNode(true);
+  let exportShell = null;
 
-  document.body.appendChild(exportShell);
+  if (!isMobileExport) {
+    exportNode.style.minHeight = "auto";
+    exportNode.style.borderRadius = "0";
+    exportNode.style.boxShadow = "none";
+    exportNode.style.margin = "0";
+    exportNode.style.width = "816px";
+    exportNode.style.display = "block";
+
+    exportShell = document.createElement("div");
+    exportShell.style.position = "absolute";
+    exportShell.style.left = "-9999px";
+    exportShell.style.top = "0";
+    exportShell.style.width = "816px";
+    exportShell.style.padding = "0";
+    exportShell.style.background = "#ffffff";
+    exportShell.style.pointerEvents = "none";
+    exportShell.style.zIndex = "-1";
+    exportShell.appendChild(exportNode);
+    document.body.appendChild(exportShell);
+  }
+
   saveStatus.textContent = "Preparing PDF...";
 
   try {
-    const isMobileExport = isMobilePdfExport();
-    const fileName = getPdfFileName();
-    const renderScale = isMobileExport ? 1 : 2;
-
-    await new Promise((resolve) => {
-      window.requestAnimationFrame(() => {
-        window.setTimeout(resolve, 200);
+    if (!isMobileExport) {
+      await new Promise((resolve) => {
+        window.requestAnimationFrame(() => {
+          window.setTimeout(resolve, 200);
+        });
       });
-    });
+    }
 
     const pdfWorker = html2pdf()
       .set({
@@ -660,23 +666,12 @@ async function exportInvoicePdf() {
       })
       .from(exportNode);
 
-    if (isMobileExport) {
-      await pdfWorker.toPdf();
-      const pdfBlob = await pdfWorker.outputPdf("blob");
-      const deliveryResult = await deliverPdfBlob(pdfBlob, fileName, { preferDownload: true });
-      saveStatus.textContent = deliveryResult === "downloaded"
-        ? "PDF downloaded."
-        : deliveryResult === "shared"
-          ? "PDF ready to share."
-          : "PDF opened in a new tab.";
-    } else {
-      await pdfWorker.save();
-      saveStatus.textContent = "PDF downloaded.";
-    }
+    await pdfWorker.save();
+    saveStatus.textContent = "PDF downloaded.";
   } catch {
     saveStatus.textContent = "Unable to generate PDF.";
   } finally {
-    exportShell.remove();
+    exportShell?.remove();
   }
 }
 
