@@ -406,7 +406,7 @@ async function saveInvoiceRecord({ printAfterSave = false } = {}) {
 
   if (!isSupabaseConfigured()) {
     if (printAfterSave) {
-      window.print();
+      await exportInvoicePdf();
     }
     return;
   }
@@ -416,7 +416,7 @@ async function saveInvoiceRecord({ printAfterSave = false } = {}) {
     const { data, error } = await client.auth.getUser();
     if (error || !data.user) {
       if (printAfterSave) {
-        window.print();
+        await exportInvoicePdf();
       }
       return;
     }
@@ -517,10 +517,76 @@ async function saveInvoiceRecord({ printAfterSave = false } = {}) {
     sync("Invoice saved to your account.");
 
     if (printAfterSave) {
-      window.print();
+      await exportInvoicePdf();
     }
   } catch (error) {
     saveStatus.textContent = error instanceof Error ? error.message : "Unable to save invoice.";
+  }
+}
+
+function getPdfFileName() {
+  const rawInvoiceNumber = String(getDisplayInvoiceNumber() || "invoice").trim();
+  const safeInvoiceNumber = rawInvoiceNumber.replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "");
+  return `${safeInvoiceNumber || "invoice"}.pdf`;
+}
+
+async function exportInvoicePdf() {
+  if (!preview) {
+    return;
+  }
+
+  const html2pdf = window.html2pdf;
+  if (typeof html2pdf !== "function") {
+    saveStatus.textContent = "PDF export is unavailable right now. Please try again.";
+    return;
+  }
+
+  const exportNode = preview.cloneNode(true);
+  exportNode.style.minHeight = "auto";
+  exportNode.style.borderRadius = "0";
+  exportNode.style.boxShadow = "none";
+  exportNode.style.margin = "0";
+
+  const exportShell = document.createElement("div");
+  exportShell.style.position = "fixed";
+  exportShell.style.left = "-99999px";
+  exportShell.style.top = "0";
+  exportShell.style.width = "816px";
+  exportShell.style.padding = "0";
+  exportShell.style.background = "#ffffff";
+  exportShell.appendChild(exportNode);
+
+  document.body.appendChild(exportShell);
+  saveStatus.textContent = "Preparing PDF...";
+
+  try {
+    await html2pdf()
+      .set({
+        filename: getPdfFileName(),
+        margin: [0.35, 0.35, 0.35, 0.35],
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+        },
+        jsPDF: {
+          unit: "in",
+          format: "letter",
+          orientation: "portrait",
+        },
+        pagebreak: {
+          mode: ["css", "legacy"],
+        },
+      })
+      .from(exportNode)
+      .save();
+
+    saveStatus.textContent = "PDF downloaded.";
+  } catch {
+    saveStatus.textContent = "Unable to generate PDF.";
+  } finally {
+    exportShell.remove();
   }
 }
 
@@ -975,11 +1041,14 @@ function sync(message) {
 async function handlePrintInvoice() {
   renderPreview();
 
-  try {
+  if (isSupabaseConfigured()) {
     await saveInvoiceRecord();
-  } finally {
-    window.print();
+    if (saveStatus.textContent === "Add a business name before saving the invoice." || saveStatus.textContent === "Add at least one line item before saving the invoice.") {
+      return;
+    }
   }
+
+  await exportInvoicePdf();
 }
 
 form.addEventListener("input", (event) => {
