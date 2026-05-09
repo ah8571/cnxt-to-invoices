@@ -172,7 +172,7 @@ a {
 
 .site-footer-grid {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(180px, 1fr));
+  grid-template-columns: minmax(0, 1.8fr) repeat(3, minmax(160px, 1fr));
   gap: 24px;
   align-items: start;
 }
@@ -209,6 +209,23 @@ a {
 
 .site-footer-link:hover {
   text-decoration: underline;
+}
+
+.site-footer-bottom {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(216, 207, 195, 0.7);
+}
+
+.site-footer-meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
 
 .legal-panel {
