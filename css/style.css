@@ -915,36 +915,45 @@ textarea:focus {
 
 @media print {
   @page {
-    margin: 0.55in;
+    margin: 0.5in;
   }
 
+  html,
   body {
-    background: #fff;
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  .hero,
-  .panel-form,
-  .preview-toolbar,
-  .site-footer {
-    display: none;
+  body * {
+    visibility: hidden !important;
   }
 
-  .page-shell,
-  .layout,
-  .panel,
-  .panel-preview,
-  .invoice-preview {
-    margin: 0;
-    padding: 0;
-    box-shadow: none;
-    border: 0;
-    background: #fff;
+  #invoice-preview,
+  #invoice-preview * {
+    visibility: visible !important;
   }
 
-  .invoice-preview {
-    min-height: auto;
+  #invoice-preview {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 24px !important;
+    min-height: auto !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+  }
+
+  #invoice-preview * {
+    box-shadow: none !important;
   }
 
   .preview-footer {
