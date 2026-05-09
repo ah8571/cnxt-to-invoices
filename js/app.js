@@ -807,16 +807,19 @@ function renderLineItems() {
     }
 
     descriptionInput.addEventListener("input", (event) => {
+      event.stopPropagation();
       state.items[index].description = event.target.value;
       updateLineItemRow();
     });
 
     quantityInput.addEventListener("input", (event) => {
+      event.stopPropagation();
       state.items[index].quantity = Number(event.target.value) || 0;
       updateLineItemRow();
     });
 
     rateInput.addEventListener("input", (event) => {
+      event.stopPropagation();
       state.items[index].rate = Number(event.target.value) || 0;
       updateLineItemRow();
     });
@@ -953,9 +956,23 @@ function sync(message) {
   saveState(message);
 }
 
+async function handlePrintInvoice() {
+  renderPreview();
+
+  try {
+    await saveInvoiceRecord();
+  } finally {
+    window.print();
+  }
+}
+
 form.addEventListener("input", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement)) {
+    return;
+  }
+
+  if (!target.name) {
     return;
   }
 
@@ -1036,7 +1053,7 @@ saveDraftButton.addEventListener("click", () => {
 });
 
 printBottomButton.addEventListener("click", () => {
-  saveInvoiceRecord({ printAfterSave: true });
+  handlePrintInvoice();
 });
 
 populateForm();

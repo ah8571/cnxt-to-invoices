@@ -47,11 +47,22 @@ a {
 }
 
 .hero {
+  margin-bottom: 28px;
+}
+
+.hero-topbar {
   display: flex;
   justify-content: space-between;
   gap: 24px;
-  align-items: end;
-  margin-bottom: 28px;
+  align-items: start;
+}
+
+.hero-copy {
+  margin-top: 18px;
+}
+
+.hero-brand {
+  margin-bottom: 0;
 }
 
 .eyebrow {
@@ -81,6 +92,7 @@ a {
   gap: 12px;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
 }
 
 .menu-shell {
@@ -89,6 +101,24 @@ a {
 
 .menu-toggle {
   min-width: 108px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.menu-toggle-icon {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.menu-toggle-icon span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
 }
 
 .app-menu {
@@ -716,7 +746,6 @@ textarea:focus {
 }
 
 @media (max-width: 720px) {
-  .hero,
   .workspace-header,
   .section-heading-inline,
   .preview-header,
@@ -762,9 +791,24 @@ textarea:focus {
   }
 
   .app-menu {
-    left: 0;
-    right: auto;
+    left: auto;
+    right: 0;
     width: min(280px, calc(100vw - 40px));
+  }
+
+  .menu-toggle {
+    min-width: 48px;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+  }
+
+  .menu-toggle-label {
+    display: none;
+  }
+
+  .menu-toggle-icon {
+    display: inline-flex;
   }
 }
 
