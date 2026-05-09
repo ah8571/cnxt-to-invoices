@@ -610,15 +610,16 @@ async function exportInvoicePdf() {
   exportNode.style.borderRadius = "0";
   exportNode.style.boxShadow = "none";
   exportNode.style.margin = "0";
+  exportNode.style.width = "816px";
+  exportNode.style.display = "block";
 
   const exportShell = document.createElement("div");
-  exportShell.style.position = "fixed";
-  exportShell.style.left = "0";
+  exportShell.style.position = "absolute";
+  exportShell.style.left = "-9999px";
   exportShell.style.top = "0";
   exportShell.style.width = "816px";
   exportShell.style.padding = "0";
   exportShell.style.background = "#ffffff";
-  exportShell.style.opacity = "0";
   exportShell.style.pointerEvents = "none";
   exportShell.style.zIndex = "-1";
   exportShell.appendChild(exportNode);
@@ -629,9 +630,13 @@ async function exportInvoicePdf() {
   try {
     const isMobileExport = isMobilePdfExport();
     const fileName = getPdfFileName();
-    const renderScale = isMobileExport
-      ? Math.min(window.devicePixelRatio || 1, 1.25)
-      : 2;
+    const renderScale = isMobileExport ? 1 : 2;
+
+    await new Promise((resolve) => {
+      window.requestAnimationFrame(() => {
+        window.setTimeout(resolve, 200);
+      });
+    });
 
     const pdfWorker = html2pdf()
       .set({
@@ -641,6 +646,7 @@ async function exportInvoicePdf() {
         html2canvas: {
           scale: renderScale,
           useCORS: true,
+          logging: false,
           backgroundColor: "#ffffff",
         },
         jsPDF: {
