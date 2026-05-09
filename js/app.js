@@ -801,19 +801,25 @@ function renderLineItems() {
     rateInput.value = String(item.rate);
     totalInput.value = formatCurrency(Number(item.quantity) * Number(item.rate));
 
+    function updateLineItemRow(message) {
+      totalInput.value = formatCurrency(Number(state.items[index].quantity) * Number(state.items[index].rate));
+      renderPreview();
+      saveState(message);
+    }
+
     descriptionInput.addEventListener("input", (event) => {
       state.items[index].description = event.target.value;
-      sync();
+      updateLineItemRow();
     });
 
     quantityInput.addEventListener("input", (event) => {
       state.items[index].quantity = Number(event.target.value) || 0;
-      sync();
+      updateLineItemRow();
     });
 
     rateInput.addEventListener("input", (event) => {
       state.items[index].rate = Number(event.target.value) || 0;
-      sync();
+      updateLineItemRow();
     });
 
     removeButton.addEventListener("click", () => {
