@@ -689,10 +689,16 @@ async function exportInvoicePdf() {
 // produces blank canvases on iOS Safari and Chrome mobile. Output is fully
 // clean (no browser headers/footers) and identical across devices.
 async function exportInvoicePdfDirect() {
-  const jspdfNs = window.jspdf || (window.html2pdf && window.html2pdf.jsPDF ? { jsPDF: window.html2pdf.jsPDF } : null);
-  const JsPDFCtor = jspdfNs && jspdfNs.jsPDF;
+  // Find jsPDF constructor across all known global shapes.
+  const candidates = [
+    window.jspdf && window.jspdf.jsPDF,
+    window.jsPDF,
+    window.html2pdf && window.html2pdf.jsPDF,
+    window.html2pdf && typeof window.html2pdf === "function" && window.html2pdf().jsPDF,
+  ];
+  const JsPDFCtor = candidates.find((c) => typeof c === "function");
   if (typeof JsPDFCtor !== "function") {
-    saveStatus.textContent = "PDF export is unavailable right now. Please try again.";
+    console.warn("jsPDF constructor not found on window");
     return false;
   }
 
@@ -1417,12 +1423,11 @@ async function handlePrintInvoice() {
     }
   }
 
-  if (isMobilePdfExport()) {
-    const ok = await exportInvoicePdfDirect();
-    if (ok) return;
-    // fall through to html2pdf only if direct renderer failed to load jsPDF
-  }
+  // Direct jsPDF renderer is the primary path for every device (no canvas).
+  const ok = await exportInvoicePdfDirect();
+  if (ok) return;
 
+  // html2pdf fallback only if jsPDF failed to load.
   await exportInvoicePdf();
 }
 
