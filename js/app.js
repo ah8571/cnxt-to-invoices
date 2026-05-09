@@ -666,8 +666,18 @@ async function exportInvoicePdf() {
       })
       .from(exportNode);
 
-    await pdfWorker.save();
-    saveStatus.textContent = "PDF downloaded.";
+    if (isMobileExport) {
+      await pdfWorker.toCanvas();
+      await pdfWorker.toPdf();
+      const pdfBlob = await pdfWorker.outputPdf("blob");
+      const deliveryResult = await deliverPdfBlob(pdfBlob, fileName, { preferDownload: true });
+      saveStatus.textContent = deliveryResult === "downloaded"
+        ? "PDF downloaded."
+        : "PDF ready.";
+    } else {
+      await pdfWorker.save();
+      saveStatus.textContent = "PDF downloaded.";
+    }
   } catch {
     saveStatus.textContent = "Unable to generate PDF.";
   } finally {
