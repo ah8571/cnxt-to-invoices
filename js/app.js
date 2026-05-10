@@ -793,8 +793,20 @@ async function exportInvoicePdfDirect() {
 
     if (state.logoDataUrl) {
       try {
+        let logoSrc = state.logoDataUrl;
+        // jsPDF cannot fetch remote URLs — convert to base64 data URL first
+        if (logoSrc.startsWith("http")) {
+          const resp = await fetch(logoSrc);
+          const blob = await resp.blob();
+          logoSrc = await new Promise((resolve, reject) => {
+            const r = new FileReader();
+            r.onload = () => resolve(r.result);
+            r.onerror = reject;
+            r.readAsDataURL(blob);
+          });
+        }
         const logoSize = 0.9;
-        doc.addImage(state.logoDataUrl, "PNG", margin, headerTop, logoSize, logoSize, undefined, "FAST");
+        doc.addImage(logoSrc, "PNG", margin, headerTop, logoSize, logoSize, undefined, "FAST");
         leftTextX = margin + logoSize + 0.18;
       } catch {
         // ignore unsupported image format
