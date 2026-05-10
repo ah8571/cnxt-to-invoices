@@ -7,6 +7,13 @@
     "userInterfaceStyle": "light",
     "assetBundlePatterns": [
       "**/*"
-    ]
+    ],
+    "android": {
+      "package": "to.cnxt.invoices",
+      "versionCode": 1
+    },
+    "ios": {
+      "bundleIdentifier": "to.cnxt.invoices"
+    }
   }
 }
