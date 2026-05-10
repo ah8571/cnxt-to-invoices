@@ -227,6 +227,7 @@ function buildBusinessProfilePayload() {
     website: state.businessWebsite || null,
     address_line_1: state.businessAddress || null,
     default_currency: state.currency || "USD",
+    logo_url: state.logoDataUrl || null,
   };
 }
 
@@ -405,7 +406,38 @@ function getMeaningfulItems() {
   });
 }
 
-async function saveInvoiceRecord({ printAfterSave = false } = {}) {
+async function loadBusinessProfileFromSupabase() {
+  if (!isSupabaseConfigured()) return;
+  try {
+    const client = await getConfiguredSupabaseClient();
+    const { data: user } = await client.auth.getUser();
+    if (!user?.user) return;
+    const { data: profiles } = await client
+      .from("invoice_business_profiles")
+      .select("business_name, email, phone, website, address_line_1, default_currency, logo_url")
+      .eq("user_id", user.user.id)
+      .limit(1);
+    const profile = profiles?.[0];
+    if (!profile) return;
+    let changed = false;
+    if (profile.business_name && !state.businessName) { state.businessName = profile.business_name; changed = true; }
+    if (profile.email && !state.businessEmail) { state.businessEmail = profile.email; changed = true; }
+    if (profile.phone && !state.businessPhone) { state.businessPhone = profile.phone; changed = true; }
+    if (profile.website && !state.businessWebsite) { state.businessWebsite = profile.website; changed = true; }
+    if (profile.address_line_1 && !state.businessAddress) { state.businessAddress = profile.address_line_1; changed = true; }
+    if (profile.default_currency && !state.currency) { state.currency = profile.default_currency; changed = true; }
+    if (profile.logo_url && !state.logoDataUrl) { state.logoDataUrl = profile.logo_url; changed = true; }
+    if (changed) {
+      saveState();
+      populateForm();
+      renderPreview();
+    }
+  } catch {
+    // non-fatal — local state is still valid
+  }
+}
+
+async function saveInvoiceRecord({ printAfterSave = false, status = "draft" } = {}) {
   saveState("Draft saved in this browser.");
 
   if (!isSupabaseConfigured()) {
@@ -466,7 +498,7 @@ async function saveInvoiceRecord({ printAfterSave = false } = {}) {
       tax_cents: toCents(totals.tax),
       discount_cents: toCents(totals.discount),
       total_cents: toCents(totals.total),
-      status: "draft",
+      status,
     };
 
     let invoiceId = state.savedInvoiceId;
@@ -1408,7 +1440,7 @@ async function handlePrintInvoice() {
   renderPreview();
 
   if (isSupabaseConfigured()) {
-    await saveInvoiceRecord();
+    await saveInvoiceRecord({ status: "sent" });
     if (saveStatus.textContent === "Add a business name before saving the invoice." || saveStatus.textContent === "Add at least one line item before saving the invoice.") {
       return;
     }
@@ -1522,3 +1554,4 @@ renderPreview();
 saveState("Draft auto-saves in your browser.");
 resumePostAuthDraftFlow();
 refreshWorkspace();
+loadBusinessProfileFromSupabase();
