@@ -135,6 +135,26 @@ signUpForm.addEventListener("submit", async (event) => {
 (async function initialize() {
   setActiveTab("sign-in");
 
+  // Synchronous check: if a Supabase session already exists in localStorage,
+  // redirect immediately without waiting for the async client to load.
+  // This prevents the loop where a signed-in user lands on auth.html and
+  // gets bounced straight back to index.html after a visible flash.
+  try {
+    const raw = localStorage.getItem("sb-jstojewashwoswsskwjk-auth-token");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const token = parsed?.access_token || parsed?.session?.access_token;
+      if (token) {
+        if (!redirectAfterAuth()) {
+          window.location.href = "./index.html";
+        }
+        return;
+      }
+    }
+  } catch {
+    // ignore — fall through to normal auth flow
+  }
+
   const client = await getClient();
   if (client) {
     // When Supabase parses an #access_token from the URL (e.g. email confirmation),

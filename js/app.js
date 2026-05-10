@@ -1683,6 +1683,23 @@ populateForm();
 renderLineItems();
 renderPreview();
 saveState("Draft auto-saves in your browser.");
+
+// Set menu auth state immediately from localStorage (before async Supabase client loads)
+// so the correct button shows the instant the page renders.
+(function applyStoredSessionToMenu() {
+  try {
+    const raw = localStorage.getItem("sb-jstojewashwoswsskwjk-auth-token");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.access_token || parsed?.session?.access_token) {
+        setMenuAuthState(true);
+      }
+    }
+  } catch {
+    // ignore — refreshWorkspace() will set correct state shortly after
+  }
+}());
+
 resumePostAuthDraftFlow();
 refreshWorkspace();
 loadBusinessProfileFromSupabase();
