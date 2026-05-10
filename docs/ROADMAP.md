@@ -1,0 +1,97 @@
+# cnxt to invoices — Development Roadmap
+
+This document tracks planned, in-progress, and potential features. The north star is a free, simple, no-nonsense invoice generator that anyone can use without signing up. Everything beyond that is additive.
+
+---
+
+## Shipped
+
+- Free invoice generator with live preview
+- Print-to-PDF export (jsPDF, no browser headers)
+- Supabase auth (email + password, email confirmation)
+- Business profile saved to Supabase (synced across devices)
+- Logo upload via Supabase Storage, restored on next login
+- Draft saving to Supabase
+- Previous invoices library
+- Menu auth state (sign in / log out toggle)
+- Instant workspace load using localStorage session cache
+
+---
+
+## Near-term (next to build)
+
+### Auto-save drafts
+As a user fills in the form, changes are debounced (e.g. 5 seconds of inactivity) and automatically upserted to Supabase as a draft. No manual "Save draft" click required. Status indicator shows "Saving…" / "Saved" inline.
+
+### New invoice flow
+A "New invoice" button that:
+- Clears the current form
+- Creates a fresh state (preserving business profile fields)
+- Does not overwrite any existing saved draft
+
+This gives returning users a clean way to start a second invoice without losing context from the first.
+
+### Invoice number management
+- Persist a per-user incrementing invoice number counter in Supabase
+- Allow custom prefix (INV-, #, blank, etc.)
+- Warn if a duplicate number is about to be saved
+
+---
+
+## Medium-term
+
+### Client address book
+Save client details (name, email, address) so repeat clients can be selected from a dropdown instead of re-typed each time. Already partially modeled in the `invoice_clients` Supabase table.
+
+### Invoice status management
+From the Previous Invoices page: mark an invoice as Paid, Overdue, or Void without reopening it in the editor.
+
+### Email delivery
+Send the invoice PDF directly to the client's email from within the app. Likely via Resend or Postmark. Optional — the PDF download path stays available regardless.
+
+### Invoice templates / themes
+Light customization: accent color, font choice, layout variant. Already has an `accent_color` column in `invoice_business_profiles`.
+
+---
+
+## Potential / exploratory
+
+### Online payment via Stripe
+
+Allow users to attach a Stripe-hosted payment link to their invoice, so clients can pay by card without the freelancer needing to set up a full payment processor themselves.
+
+**How other invoice apps handle this:**
+- FreshBooks, Wave, Bonsai, Invoice Ninja, AND.CO — all route card payments through Stripe Connect under the hood
+- Square invoices use Square's own card rails (they started as hardware)
+- Most SaaS invoicing tools use Stripe because it handles card vaulting, PCI compliance, and payouts without the vendor needing to touch card data
+
+**How this could work for cnxt:**
+1. User connects their Stripe account via Stripe Connect (OAuth flow, one-time setup)
+2. When generating an invoice, they optionally create a Stripe Payment Link tied to the invoice total
+3. The payment link URL is embedded in the PDF footer and/or copied to clipboard
+4. Client opens the link → enters card details on Stripe's hosted page → funds go to the user's Stripe account
+5. cnxt never touches card data — Stripe handles all PCI scope
+
+**What this is not:**
+- Not a payment processor built into cnxt
+- Not mandatory — users who don't connect Stripe see no change
+- Not a Stripe reseller arrangement — each user connects their own Stripe account
+
+**Considerations before building:**
+- Stripe Connect requires a platform application approval from Stripe
+- Platform fees (if any) need a decision — cnxt could take 0% and just pass through, or take a small cut
+- Would require a backend component (a Cloudflare Worker) to create payment links server-side using the Stripe secret key — cannot be done from the browser
+- Out of scope for MVP; revisit once the core product is stable
+
+---
+
+## Out of scope (intentionally)
+
+- Recurring invoice automation (complex, better suited to dedicated billing tools)
+- Multi-user / team access
+- Accounting integrations (QuickBooks, Xero)
+- Time tracking
+
+---
+
+*Last updated: May 2026*
