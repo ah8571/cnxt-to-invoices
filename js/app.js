@@ -327,6 +327,33 @@ async function upsertClientRecord(client, user, businessProfileId) {
   return data.id;
 }
 
+async function uploadLogoToStorage(client, user) {
+  const dataUrl = state.logoDataUrl;
+  if (!dataUrl || !dataUrl.startsWith("data:")) {
+    // Already a remote URL or empty — nothing to upload
+    return;
+  }
+
+  // Convert base64 data URL to a Blob
+  const [header, base64] = dataUrl.split(",");
+  const mime = header.match(/:(.*?);/)?.[1] || "image/png";
+  const ext = mime.split("/")[1] || "png";
+  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  const blob = new Blob([bytes], { type: mime });
+
+  const path = `${user.id}/logo.${ext}`;
+  const { error } = await client.storage.from("logos").upload(path, blob, {
+    upsert: true,
+    contentType: mime,
+  });
+  if (error) throw error;
+
+  const { data } = client.storage.from("logos").getPublicUrl(path);
+  // Append cache-buster so browsers pick up a newly uploaded logo
+  state.logoDataUrl = `${data.publicUrl}?t=${Date.now()}`;
+  saveState();
+}
+
 async function saveBusinessProfile() {
   if (businessProfileStatus) businessProfileStatus.textContent = "Saving…";
   const client = await getAppSupabaseClient();
@@ -342,6 +369,7 @@ async function saveBusinessProfile() {
   }
 
   try {
+    await uploadLogoToStorage(client, user);
     await upsertBusinessProfile(client, user);
   } catch (error) {
     if (businessProfileStatus) businessProfileStatus.textContent = error instanceof Error ? error.message : "Unable to save business info.";

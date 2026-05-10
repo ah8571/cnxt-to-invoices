@@ -240,3 +240,23 @@ drop trigger if exists on_auth_user_created_invoice on auth.users;
 create trigger on_auth_user_created_invoice
 after insert on auth.users
 for each row execute function public.handle_new_invoice_user();
+
+-- ---- Storage: logos bucket ----
+insert into storage.buckets (id, name, public)
+values ('logos', 'logos', true)
+on conflict (id) do nothing;
+
+drop policy if exists "Authenticated users can upload logos" on storage.objects;
+create policy "Authenticated users can upload logos"
+  on storage.objects for insert
+  with check (bucket_id = 'logos' and auth.role() = 'authenticated');
+
+drop policy if exists "Authenticated users can update logos" on storage.objects;
+create policy "Authenticated users can update logos"
+  on storage.objects for update
+  using (bucket_id = 'logos' and auth.role() = 'authenticated');
+
+drop policy if exists "Public can read logos" on storage.objects;
+create policy "Public can read logos"
+  on storage.objects for select
+  using (bucket_id = 'logos');
