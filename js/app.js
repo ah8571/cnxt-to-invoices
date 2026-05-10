@@ -19,6 +19,8 @@ const logoInput = document.querySelector("#logo-input");
 const clearLogoButton = document.querySelector("#clear-logo");
 const saveBusinessProfileButton = document.querySelector("#save-business-profile");
 const businessProfileStatus = document.querySelector("#business-profile-status");
+const menuAuthLink = document.querySelector("#menu-auth-link");
+const menuSignOutButton = document.querySelector("#menu-signout-button");
 const workspaceSection = document.querySelector("#account-workspace");
 const workspaceSubtitle = document.querySelector("#workspace-subtitle");
 const refreshWorkspaceButton = document.querySelector("#refresh-workspace");
@@ -1048,6 +1050,7 @@ function createSignedOutWorkspaceMarkup(kind) {
 }
 
 function showSignedOutWorkspace(mode = "signed-out") {
+  setMenuAuthState(false);
   workspaceSection.classList.remove("hidden");
   refreshWorkspaceButton.classList.add("hidden");
   workspaceSubtitle.textContent = mode === "configured"
@@ -1170,6 +1173,7 @@ async function refreshWorkspace() {
 
     workspaceSection.classList.remove("hidden");
     refreshWorkspaceButton.classList.remove("hidden");
+    setMenuAuthState(true);
     workspaceSubtitle.textContent = `Signed in as ${data.user.email}. Drafts and previous invoices sync to your account.`;
 
     const [{ data: drafts, error: draftsError }, { data: invoices, error: invoicesError }] = await Promise.all([
@@ -1542,6 +1546,20 @@ if (invoicesTabButton) {
 if (saveDraftButton) {
   saveDraftButton.addEventListener("click", () => {
     handleSaveDraft();
+  });
+}
+
+function setMenuAuthState(signedIn) {
+  if (menuAuthLink) menuAuthLink.classList.toggle("hidden", signedIn);
+  if (menuSignOutButton) menuSignOutButton.classList.toggle("hidden", !signedIn);
+}
+
+if (menuSignOutButton) {
+  menuSignOutButton.addEventListener("click", async () => {
+    const client = await getConfiguredSupabaseClient().catch(() => null);
+    if (client) await client.auth.signOut();
+    setMenuAuthState(false);
+    window.location.href = "./auth.html";
   });
 }
 
