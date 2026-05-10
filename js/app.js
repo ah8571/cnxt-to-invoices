@@ -227,7 +227,6 @@ function buildBusinessProfilePayload() {
     website: state.businessWebsite || null,
     address_line_1: state.businessAddress || null,
     default_currency: state.currency || "USD",
-    logo_url: state.logoDataUrl || null,
   };
 }
 
@@ -414,7 +413,7 @@ async function loadBusinessProfileFromSupabase() {
     if (!user?.user) return;
     const { data: profiles } = await client
       .from("invoice_business_profiles")
-      .select("business_name, email, phone, website, address_line_1, default_currency, logo_url")
+      .select("business_name, email, phone, website, address_line_1, default_currency")
       .eq("user_id", user.user.id)
       .limit(1);
     const profile = profiles?.[0];
@@ -426,7 +425,6 @@ async function loadBusinessProfileFromSupabase() {
     if (profile.website && !state.businessWebsite) { state.businessWebsite = profile.website; changed = true; }
     if (profile.address_line_1 && !state.businessAddress) { state.businessAddress = profile.address_line_1; changed = true; }
     if (profile.default_currency && !state.currency) { state.currency = profile.default_currency; changed = true; }
-    if (profile.logo_url && !state.logoDataUrl) { state.logoDataUrl = profile.logo_url; changed = true; }
     if (changed) {
       saveState();
       populateForm();
