@@ -21,6 +21,7 @@ const saveBusinessProfileButton = document.querySelector("#save-business-profile
 const businessProfileStatus = document.querySelector("#business-profile-status");
 const menuAuthLink = document.querySelector("#menu-auth-link");
 const menuSignOutButton = document.querySelector("#menu-signout-button");
+const newInvoiceButton = document.querySelector("#new-invoice-button");
 const workspaceSection = document.querySelector("#account-workspace");
 const workspaceSubtitle = document.querySelector("#workspace-subtitle");
 const refreshWorkspaceButton = document.querySelector("#refresh-workspace");
@@ -41,6 +42,7 @@ const currencySymbols = {
 let draftsCache = [];
 let invoicesCache = [];
 let activeWorkspaceTab = "drafts";
+let autoSaveTimer = null;
 
 function defaultState() {
   return {
@@ -95,6 +97,7 @@ function loadState() {
 function saveState(message = "Draft stored in your browser.") {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   saveStatus.textContent = message;
+  scheduleAutoSave();
 }
 
 function persistStateSilently() {
@@ -189,6 +192,24 @@ function applyStateFromPayload(payload, message = "Draft loaded.") {
     items: normalizeItems(payload.items),
   };
   sync(message);
+}
+
+function handleNewInvoice() {
+  // Keep business profile fields; clear client + invoice-specific fields
+  state = {
+    ...defaultState(),
+    businessName: state.businessName,
+    businessEmail: state.businessEmail,
+    businessPhone: state.businessPhone,
+    businessWebsite: state.businessWebsite,
+    businessAddress: state.businessAddress,
+    logoDataUrl: state.logoDataUrl,
+    currency: state.currency,
+    invoiceNumber: generateInvoiceNumber(),
+    issueDate: todayIso(),
+  };
+  advanceInvoiceSequence();
+  sync("New invoice started.");
 }
 
 function redirectToAuth(action = "signin") {
@@ -1613,6 +1634,49 @@ if (printBottomButton) {
   printBottomButton.addEventListener("click", () => {
     handlePrintInvoice();
   });
+}
+
+if (newInvoiceButton) {
+  newInvoiceButton.addEventListener("click", () => {
+    handleNewInvoice();
+  });
+}
+
+// Auto-save draft to Supabase 5 seconds after the last change
+function scheduleAutoSave() {
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(async () => {
+    if (!isSupabaseConfigured()) return;
+    try {
+      const client = await getConfiguredSupabaseClient();
+      const { data } = await client.auth.getSession();
+      if (!data.session?.user) return;
+      const user = data.session.user;
+
+      const draftPayload = buildDraftPayload();
+      if (state.savedDraftId) {
+        await client
+          .from("invoice_drafts")
+          .update({ draft_name: buildDraftName(), payload_json: draftPayload })
+          .eq("id", state.savedDraftId)
+          .eq("user_id", user.id);
+      } else {
+        const { data: draftRecord } = await client
+          .from("invoice_drafts")
+          .insert({ user_id: user.id, draft_name: buildDraftName(), payload_json: draftPayload })
+          .select("id")
+          .single();
+        if (draftRecord?.id) {
+          state.savedDraftId = draftRecord.id;
+          persistStateSilently();
+        }
+      }
+      saveStatus.textContent = "Auto-saved.";
+      setTimeout(() => { if (saveStatus.textContent === "Auto-saved.") saveStatus.textContent = ""; }, 3000);
+    } catch {
+      // non-fatal — local state is still valid
+    }
+  }, 5000);
 }
 
 populateForm();
