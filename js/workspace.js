@@ -171,8 +171,9 @@ async function refreshWorkspacePage() {
 
   try {
     const client = await getSupabaseClient();
-    const { data, error } = await client.auth.getUser();
-    if (error || !data.user) {
+    const { data, error } = await client.auth.getSession();
+    const user = data.session?.user;
+    if (error || !user) {
       refreshButton.classList.add("hidden");
       setHeaderAuthState(false);
       showSignedOutState("Sign in to access your saved drafts and previous invoices.");
@@ -181,13 +182,13 @@ async function refreshWorkspacePage() {
 
     refreshButton.classList.remove("hidden");
     setHeaderAuthState(true);
-    subtitle.textContent = `Signed in as ${data.user.email}.`;
+    subtitle.textContent = `Signed in as ${user.email}.`;
 
     if (workspaceKind === "drafts") {
       const { data: drafts, error: draftsError } = await client
         .from("invoice_drafts")
         .select("id, draft_name, payload_json, updated_at")
-        .eq("user_id", data.user.id)
+        .eq("user_id", user.id)
         .order("updated_at", { ascending: false });
 
       if (draftsError) {
@@ -213,7 +214,7 @@ async function refreshWorkspacePage() {
         client:invoice_clients (client_name, email, address_line_1),
         items:invoice_items (description, quantity, unit_price_cents, sort_order)
       `)
-      .eq("user_id", data.user.id)
+.eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
     if (invoicesError) {

@@ -164,6 +164,10 @@ a {
   display: block;
 }
 
+.app-menu-link.hidden {
+  display: none;
+}
+
 .site-footer {
   margin-top: 28px;
   padding: 24px 0 8px;

@@ -1198,8 +1198,9 @@ async function refreshWorkspace() {
 
   try {
     const client = await getConfiguredSupabaseClient();
-    const { data, error } = await client.auth.getUser();
-    if (error || !data.user) {
+    const { data, error } = await client.auth.getSession();
+    const user = data.session?.user;
+    if (error || !user) {
       showSignedOutWorkspace("configured");
       return;
     }
@@ -1207,13 +1208,13 @@ async function refreshWorkspace() {
     workspaceSection.classList.remove("hidden");
     refreshWorkspaceButton.classList.remove("hidden");
     setMenuAuthState(true);
-    workspaceSubtitle.textContent = `Signed in as ${data.user.email}. Drafts and previous invoices sync to your account.`;
+    workspaceSubtitle.textContent = `Signed in as ${user.email}. Drafts and previous invoices sync to your account.`;
 
     const [{ data: drafts, error: draftsError }, { data: invoices, error: invoicesError }] = await Promise.all([
       client
         .from("invoice_drafts")
         .select("id, draft_name, payload_json, updated_at")
-        .eq("user_id", data.user.id)
+        .eq("user_id", user.id)
         .order("updated_at", { ascending: false }),
       client
         .from("invoices")
@@ -1230,7 +1231,7 @@ async function refreshWorkspace() {
           client:invoice_clients (client_name, email, address_line_1),
           items:invoice_items (description, quantity, unit_price_cents, sort_order)
         `)
-        .eq("user_id", data.user.id)
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false }),
     ]);
 
