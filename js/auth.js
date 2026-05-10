@@ -88,8 +88,9 @@ signInForm.addEventListener("submit", async (event) => {
   }
 
   signInForm.reset();
-  await refreshSessionStatus();
-  redirectAfterAuth();
+  if (!redirectAfterAuth()) {
+    window.location.href = "./index.html";
+  }
 });
 
 signUpForm.addEventListener("submit", async (event) => {

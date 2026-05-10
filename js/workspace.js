@@ -8,6 +8,25 @@ const workspaceKind = document.body.dataset.workspaceKind || "drafts";
 const subtitle = document.querySelector("#workspace-subtitle");
 const refreshButton = document.querySelector("#refresh-workspace");
 const list = document.querySelector("#workspace-list");
+const headerAuthLink = document.querySelector("#header-auth-link");
+const headerSignOutButton = document.querySelector("#header-signout-button");
+
+function setHeaderAuthState(signedIn) {
+  if (headerAuthLink) headerAuthLink.classList.toggle("hidden", signedIn);
+  if (headerSignOutButton) headerSignOutButton.classList.toggle("hidden", !signedIn);
+}
+
+if (headerSignOutButton) {
+  headerSignOutButton.addEventListener("click", async () => {
+    try {
+      const client = await getSupabaseClient();
+      await client.auth.signOut();
+    } catch {
+      // ignore
+    }
+    window.location.href = "./auth.html";
+  });
+}
 
 function escapeHtml(value) {
   return String(value)
@@ -145,6 +164,7 @@ function renderInvoices(invoices) {
 async function refreshWorkspacePage() {
   if (!isSupabaseConfigured()) {
     refreshButton.classList.add("hidden");
+    setHeaderAuthState(false);
     showSignedOutState("Add Supabase config and sign in to unlock your saved invoice library.");
     return;
   }
@@ -154,11 +174,13 @@ async function refreshWorkspacePage() {
     const { data, error } = await client.auth.getUser();
     if (error || !data.user) {
       refreshButton.classList.add("hidden");
+      setHeaderAuthState(false);
       showSignedOutState("Sign in to access your saved drafts and previous invoices.");
       return;
     }
 
     refreshButton.classList.remove("hidden");
+    setHeaderAuthState(true);
     subtitle.textContent = `Signed in as ${data.user.email}.`;
 
     if (workspaceKind === "drafts") {
