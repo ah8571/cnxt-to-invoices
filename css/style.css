@@ -914,6 +914,15 @@ textarea:focus {
     width: min(280px, calc(100vw - 40px));
   }
 
+  .menu-shell {
+    order: 0;
+  }
+
+  #new-invoice-button {
+    order: 1;
+    width: 100%;
+  }
+
   .menu-toggle {
     min-width: 48px;
     width: 48px;
