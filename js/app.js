@@ -18,6 +18,7 @@ const appMenu = document.querySelector("#app-menu");
 const logoInput = document.querySelector("#logo-input");
 const clearLogoButton = document.querySelector("#clear-logo");
 const saveBusinessProfileButton = document.querySelector("#save-business-profile");
+const businessProfileStatus = document.querySelector("#business-profile-status");
 const workspaceSection = document.querySelector("#account-workspace");
 const workspaceSubtitle = document.querySelector("#workspace-subtitle");
 const refreshWorkspaceButton = document.querySelector("#refresh-workspace");
@@ -324,24 +325,28 @@ async function upsertClientRecord(client, user, businessProfileId) {
 }
 
 async function saveBusinessProfile() {
+  if (businessProfileStatus) businessProfileStatus.textContent = "Saving…";
   const client = await getAppSupabaseClient();
   if (!client) {
+    if (businessProfileStatus) businessProfileStatus.textContent = "";
     return;
   }
 
   const user = await getSignedInUser(client);
   if (!user) {
+    if (businessProfileStatus) businessProfileStatus.textContent = "";
     return;
   }
 
   try {
     await upsertBusinessProfile(client, user);
   } catch (error) {
-    saveStatus.textContent = error instanceof Error ? error.message : "Unable to save business info.";
+    if (businessProfileStatus) businessProfileStatus.textContent = error instanceof Error ? error.message : "Unable to save business info.";
     return;
   }
 
-  saveStatus.textContent = "Business info saved. Click save again anytime to update it.";
+  if (businessProfileStatus) businessProfileStatus.textContent = "Business info saved.";
+  setTimeout(() => { if (businessProfileStatus) businessProfileStatus.textContent = ""; }, 4000);
 }
 
 async function handleSaveDraft() {
