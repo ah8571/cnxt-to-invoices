@@ -313,7 +313,7 @@ a {
   justify-content: space-between;
   gap: 12px;
   align-items: start;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .workspace-card h3 {
@@ -328,11 +328,41 @@ a {
 }
 
 .workspace-card-meta {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 0 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
+.card-amount {
+  font-size: 1rem;
+  font-weight: bold;
+  color: var(--ink);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.status-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-family: system-ui, sans-serif;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--line);
+  color: var(--muted);
+}
+
+.status-sent    { background: #d8efe9; color: #0d6b61; }
+.status-paid    { background: #d4edda; color: #1a6630; }
+.status-overdue { background: #fde8e8; color: #9b2020; }
+.status-void    { background: #ebebeb; color: #888; }
+
 .workspace-card-actions {
-  margin-top: 12px;
+  margin-top: 14px;
 }
 
 .workspace-empty {

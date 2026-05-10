@@ -81,22 +81,43 @@ function showSignedOutState(message) {
   });
 }
 
+function draftTotal(payload) {
+  if (!Array.isArray(payload?.items)) return "";
+  const total = payload.items.reduce((sum, item) => {
+    return sum + (Number(item.quantity || 0) * Number(item.rate || 0));
+  }, 0);
+  const symbols = { USD: "$", EUR: "EUR ", GBP: "GBP ", CAD: "CAD " };
+  const symbol = symbols[payload.currency || "USD"] || `${payload.currency || "USD"} `;
+  return total > 0 ? `${symbol}${total.toFixed(2)}` : "";
+}
+
 function renderDrafts(drafts) {
   list.innerHTML = drafts.length > 0
-    ? drafts.map((draft) => `
+    ? drafts.map((draft) => {
+        const p = draft.payload_json || {};
+        const client = p.clientName ? escapeHtml(p.clientName) : "";
+        const invNum = p.invoiceNumber ? escapeHtml(p.invoiceNumber) : "";
+        const total = draftTotal(p);
+        const meta = [invNum, client].filter(Boolean).join(" · ");
+        const totalMarkup = total ? `<span class="card-amount">${escapeHtml(total)}</span>` : "";
+        return `
       <article class="workspace-card">
         <div class="workspace-card-header">
-          <div>
-            <h3>${escapeHtml(draft.draft_name || "Untitled draft")}</h3>
-            <p class="workspace-card-meta">Updated ${escapeHtml(formatRelativeDate(draft.updated_at))}</p>
-          </div>
+          <h3>${escapeHtml(draft.draft_name || "Untitled draft")}</h3>
+          ${totalMarkup}
         </div>
-        <div class="workspace-card-actions button-row">
+        ${meta ? `<p class="workspace-card-meta">${meta}</p>` : ""}
+        <p class="workspace-card-meta">Updated ${escapeHtml(formatRelativeDate(draft.updated_at))}</p>
+        <div class="workspace-card-actions">
           <button class="button workspace-open-draft" type="button" data-draft-id="${draft.id}">Open in editor</button>
         </div>
       </article>
-    `).join("")
-    : '<div class="workspace-empty">No saved drafts yet.</div>';
+    `;
+      }).join("")
+    : `<div class="workspace-empty">
+        <p>No saved drafts yet. Start an invoice and it will auto-save here.</p>
+        <a class="button" href="./index.html">Create invoice</a>
+      </div>`;
 
   list.querySelectorAll(".workspace-open-draft").forEach((button) => {
     button.addEventListener("click", () => {
@@ -110,24 +131,34 @@ function renderDrafts(drafts) {
   });
 }
 
+function statusBadge(status) {
+  const labels = { draft: "Draft", sent: "Sent", paid: "Paid", overdue: "Overdue", void: "Void" };
+  const label = labels[status] || status || "Draft";
+  return `<span class="status-badge status-${escapeHtml(status || "draft")}">${escapeHtml(label)}</span>`;
+}
+
 function renderInvoices(invoices) {
   list.innerHTML = invoices.length > 0
-    ? invoices.map((invoice) => `
+    ? invoices.map((invoice) => {
+        const client = invoice.client?.client_name ? escapeHtml(invoice.client.client_name) : "";
+        return `
       <article class="workspace-card">
         <div class="workspace-card-header">
-          <div>
-            <h3>${escapeHtml(invoice.invoice_number || "Saved invoice")}</h3>
-            <p class="workspace-card-meta">${escapeHtml(formatRelativeDate(invoice.issue_date))} · ${escapeHtml(invoice.status || "draft")}</p>
-          </div>
-          <p>${escapeHtml(formatStoredMoney(invoice.total_cents, invoice.currency || "USD"))}</p>
+          <h3>${escapeHtml(invoice.invoice_number || "Saved invoice")}</h3>
+          <span class="card-amount">${escapeHtml(formatStoredMoney(invoice.total_cents, invoice.currency || "USD"))}</span>
         </div>
-        <p class="workspace-card-copy">Open this invoice in the editor when you need to revise it.</p>
-        <div class="workspace-card-actions button-row">
+        ${client ? `<p class="workspace-card-meta">${client}</p>` : ""}
+        <p class="workspace-card-meta">${escapeHtml(formatRelativeDate(invoice.issue_date))} ${statusBadge(invoice.status)}</p>
+        <div class="workspace-card-actions">
           <button class="button workspace-open-invoice" type="button" data-invoice-id="${invoice.id}">Open in editor</button>
         </div>
       </article>
-    `).join("")
-    : '<div class="workspace-empty">No saved invoices yet.</div>';
+    `;
+      }).join("")
+    : `<div class="workspace-empty">
+        <p>No saved invoices yet. Download a PDF and it will appear here.</p>
+        <a class="button" href="./index.html">Create invoice</a>
+      </div>`;
 
   list.querySelectorAll(".workspace-open-invoice").forEach((button) => {
     button.addEventListener("click", () => {
