@@ -94,4 +94,23 @@ Allow users to attach a Stripe-hosted payment link to their invoice, so clients 
 
 ---
 
+## Mobile app
+
+A native or hybrid mobile app for iOS and Android, submitted to the App Store and Google Play under a registered company entity (required before public submission).
+
+**Approach options:**
+- **Capacitor (recommended)** — wraps the existing HTML/CSS/JS app in a native shell. Minimal rewrite. Same Supabase auth and data layer. Fast to ship.
+- React Native — full rewrite, more native feel, more effort
+- PWA (progressive web app) — no app store listing, but installable on home screen and works offline
+
+**AdMob integration (optional, non-intrusive)**
+Google AdMob banner ads at the bottom of the app as a passive revenue stream to sustain infrastructure costs. Implemented via the Capacitor AdMob plugin. Key decisions before building:
+- Ad placement: bottom banner only (non-intrusive); no interstitials or full-screen ads
+- Ad-free option: could offer a one-time in-app purchase to remove ads permanently
+- Revenue split: 100% goes to the cnxt company entity (no platform cut beyond AdMob's standard 32%)
+- Requires a Google AdMob account and app registration before ads can serve
+- Out of scope until after App Store submission process is complete
+
+---
+
 *Last updated: May 2026*
