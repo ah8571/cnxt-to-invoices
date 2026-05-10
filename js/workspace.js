@@ -98,7 +98,11 @@ function renderDrafts(drafts) {
         const client = p.clientName ? escapeHtml(p.clientName) : "";
         const invNum = p.invoiceNumber ? escapeHtml(p.invoiceNumber) : "";
         const total = draftTotal(p);
-        const meta = [invNum, client].filter(Boolean).join(" · ");
+        const draftTitle = draft.draft_name || "";
+        const metaParts = [];
+        if (invNum && invNum !== draftTitle) metaParts.push(invNum);
+        if (client && client !== draftTitle) metaParts.push(client);
+        const meta = metaParts.join(" · ");
         const totalMarkup = total ? `<span class="card-amount">${escapeHtml(total)}</span>` : "";
         return `
       <article class="workspace-card">
