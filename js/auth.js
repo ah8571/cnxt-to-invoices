@@ -131,7 +131,21 @@ signUpForm.addEventListener("submit", async (event) => {
   setFeedback("Check your email to finish creating your account.", "success");
 });
 
-(function initialize() {
+(async function initialize() {
   setActiveTab("sign-in");
-  refreshSessionStatus();
+
+  const client = await getClient();
+  if (client) {
+    // When Supabase parses an #access_token from the URL (e.g. email confirmation),
+    // onAuthStateChange fires with SIGNED_IN. Redirect into the app immediately.
+    client.auth.onAuthStateChange((event, session) => {
+      if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED") && session?.user) {
+        if (!redirectAfterAuth()) {
+          window.location.href = "./index.html";
+        }
+      }
+    });
+
+    await refreshSessionStatus();
+  }
 })();
