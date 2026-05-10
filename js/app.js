@@ -346,7 +346,10 @@ async function uploadLogoToStorage(client, user) {
     upsert: true,
     contentType: mime,
   });
-  if (error) throw error;
+  if (error) {
+    console.error("Logo storage upload failed:", error);
+    throw error;
+  }
 
   const { data } = client.storage.from("logos").getPublicUrl(path);
   // Append cache-buster so browsers pick up a newly uploaded logo

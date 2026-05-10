@@ -249,14 +249,18 @@ on conflict (id) do nothing;
 drop policy if exists "Authenticated users can upload logos" on storage.objects;
 create policy "Authenticated users can upload logos"
   on storage.objects for insert
-  with check (bucket_id = 'logos' and auth.role() = 'authenticated');
+  to authenticated
+  with check (bucket_id = 'logos');
 
 drop policy if exists "Authenticated users can update logos" on storage.objects;
 create policy "Authenticated users can update logos"
   on storage.objects for update
-  using (bucket_id = 'logos' and auth.role() = 'authenticated');
+  to authenticated
+  using (bucket_id = 'logos');
 
 drop policy if exists "Public can read logos" on storage.objects;
 create policy "Public can read logos"
   on storage.objects for select
+  to anon, authenticated
   using (bucket_id = 'logos');
+
