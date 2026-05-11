@@ -3,13 +3,12 @@ import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 type Props = {
   activeScreen: "invoice" | "drafts" | "invoices";
-  onNewInvoice: () => void;
   onDrafts: () => void;
   onInvoices: () => void;
   onSignOut: () => void;
 };
 
-export default function TopBar({ activeScreen, onNewInvoice, onDrafts, onInvoices, onSignOut }: Props) {
+export default function TopBar({ activeScreen, onDrafts, onInvoices, onSignOut }: Props) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -24,9 +23,6 @@ export default function TopBar({ activeScreen, onNewInvoice, onDrafts, onInvoice
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
           <View style={styles.menu}>
-            <Pressable style={styles.item} onPress={() => { setOpen(false); onNewInvoice(); }}>
-              <Text style={[styles.label, activeScreen === "invoice" && styles.active]}>Create invoice</Text>
-            </Pressable>
             <Pressable style={styles.item} onPress={() => { setOpen(false); onDrafts(); }}>
               <Text style={[styles.label, activeScreen === "drafts" && styles.active]}>Drafts</Text>
             </Pressable>

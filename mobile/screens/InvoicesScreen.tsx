@@ -21,7 +21,6 @@ type Invoice = {
 };
 
 type Props = {
-  onNewInvoice: () => void;
   onDrafts: () => void;
   onSignOut: () => void;
 };
@@ -45,7 +44,7 @@ function formatMoney(cents: number | null, currency: string | null) {
   return `${sym}${((cents || 0) / 100).toFixed(2)}`;
 }
 
-export default function InvoicesScreen({ onNewInvoice, onDrafts, onSignOut }: Props) {
+export default function InvoicesScreen({ onDrafts, onSignOut }: Props) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -84,7 +83,6 @@ export default function InvoicesScreen({ onNewInvoice, onDrafts, onSignOut }: Pr
       <View style={styles.topbarWrap}>
         <TopBar
           activeScreen="invoices"
-          onNewInvoice={onNewInvoice}
           onDrafts={onDrafts}
           onInvoices={() => {}}
           onSignOut={onSignOut}

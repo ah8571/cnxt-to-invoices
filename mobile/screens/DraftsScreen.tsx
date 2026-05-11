@@ -76,7 +76,6 @@ export default function DraftsScreen({ onOpenDraft, onNewInvoice, onViewInvoices
       <View style={styles.topbarWrap}>
         <TopBar
           activeScreen="drafts"
-          onNewInvoice={onNewInvoice}
           onDrafts={() => {}}
           onInvoices={onViewInvoices}
           onSignOut={onSignOut}

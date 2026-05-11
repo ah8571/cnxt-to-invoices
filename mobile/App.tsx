@@ -10,7 +10,7 @@ import InvoicesScreen from "./screens/InvoicesScreen";
 import { supabase } from "./lib/supabase";
 
 export type RootStackParamList = {
-  Invoice: undefined;
+  Invoice: { draftId?: string; draftPayload?: Record<string, unknown> } | undefined;
   Drafts: undefined;
   Invoices: undefined;
 };
