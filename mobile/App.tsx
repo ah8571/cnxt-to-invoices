@@ -6,11 +6,13 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import AuthScreen from "./screens/AuthScreen";
 import DraftsScreen from "./screens/DraftsScreen";
 import InvoiceScreen from "./screens/InvoiceScreen";
+import InvoicesScreen from "./screens/InvoicesScreen";
 import { supabase } from "./lib/supabase";
 
 export type RootStackParamList = {
   Invoice: undefined;
   Drafts: undefined;
+  Invoices: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -59,24 +61,38 @@ export default function App() {
         >
           <Stack.Screen
             name="Invoice"
-            options={{ title: "New invoice", headerShown: false }}
+            options={{ headerShown: false }}
           >
             {(props) => (
               <InvoiceScreen
                 onSignOut={() => setSession(false)}
                 onViewDrafts={() => props.navigation.navigate("Drafts")}
+                onViewInvoices={() => props.navigation.navigate("Invoices")}
               />
             )}
           </Stack.Screen>
           <Stack.Screen
             name="Drafts"
-            options={{ title: "Saved drafts" }}
+            options={{ headerShown: false }}
           >
             {(props) => (
               <DraftsScreen
-                onOpenDraft={() => {
-                  props.navigation.navigate("Invoice");
-                }}
+                onOpenDraft={() => props.navigation.navigate("Invoice")}
+                onNewInvoice={() => props.navigation.navigate("Invoice")}
+                onViewInvoices={() => props.navigation.navigate("Invoices")}
+                onSignOut={() => setSession(false)}
+              />
+            )}
+          </Stack.Screen>
+          <Stack.Screen
+            name="Invoices"
+            options={{ headerShown: false }}
+          >
+            {(props) => (
+              <InvoicesScreen
+                onNewInvoice={() => props.navigation.navigate("Invoice")}
+                onDrafts={() => props.navigation.navigate("Drafts")}
+                onSignOut={() => setSession(false)}
               />
             )}
           </Stack.Screen>

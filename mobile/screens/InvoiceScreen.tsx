@@ -10,12 +10,14 @@ import {
   View,
 } from "react-native";
 import { supabase } from "../lib/supabase";
+import TopBar from "../components/TopBar";
 
 type LineItem = { description: string; quantity: string; rate: string };
 
 type Props = {
   onSignOut: () => void;
   onViewDrafts?: () => void;
+  onViewInvoices?: () => void;
 };
 
 function defaultItem(): LineItem {
@@ -32,7 +34,7 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function InvoiceScreen({ onSignOut, onViewDrafts }: Props) {
+export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices }: Props) {
   const [businessName, setBusinessName] = useState("");
   const [businessEmail, setBusinessEmail] = useState("");
   const [businessPhone, setBusinessPhone] = useState("");
@@ -140,19 +142,13 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts }: Props) {
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
       {/* Header */}
-      <View style={styles.topbar}>
-        <Text style={styles.brand}>cnxt to invoices</Text>
-        <View style={styles.topbarActions}>
-          {onViewDrafts && (
-            <Pressable onPress={onViewDrafts} style={styles.topbarBtn}>
-              <Text style={styles.topbarBtnLabel}>Drafts</Text>
-            </Pressable>
-          )}
-          <Pressable onPress={handleSignOut}>
-            <Text style={styles.signOutLink}>Log out</Text>
-          </Pressable>
-        </View>
-      </View>
+      <TopBar
+        activeScreen="invoice"
+        onNewInvoice={resetForm}
+        onDrafts={onViewDrafts ?? (() => {})}
+        onInvoices={onViewInvoices ?? (() => {})}
+        onSignOut={handleSignOut}
+      />
 
       {userEmail ? <Text style={styles.userEmail}>{userEmail}</Text> : null}
       {status ? <Text style={styles.autoSaveStatus}>{status}</Text> : null}
@@ -252,12 +248,7 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts }: Props) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#f4f1ea" },
   inner: { padding: 20, paddingTop: 56, gap: 10 },
-  topbar: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
-  brand: { fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "#0d6b61" },
-  topbarActions: { flexDirection: "row", gap: 16, alignItems: "center" },
-  topbarBtn: {},
-  topbarBtnLabel: { fontSize: 13, color: "#0d6b61", fontWeight: "600" },
-  signOutLink: { fontSize: 13, color: "#675f58" },
+
   userEmail: { fontSize: 12, color: "#675f58", marginBottom: 8 },
   newInvoiceBtn: { backgroundColor: "#0d6b61", borderRadius: 10, paddingVertical: 11, paddingHorizontal: 16, alignSelf: "flex-start" },
   newInvoiceBtnLabel: { color: "#fffdf8", fontSize: 13, fontWeight: "700" },

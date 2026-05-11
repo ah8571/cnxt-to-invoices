@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { supabase } from "../lib/supabase";
+import TopBar from "../components/TopBar";
 
 type Draft = {
   id: string;
@@ -19,6 +20,9 @@ type Draft = {
 
 type Props = {
   onOpenDraft: (draft: Draft) => void;
+  onNewInvoice: () => void;
+  onViewInvoices: () => void;
+  onSignOut: () => void;
 };
 
 function formatDate(value: string | null) {
@@ -33,7 +37,7 @@ function draftTotal(payload: Record<string, unknown>): string {
   return total > 0 ? `$${total.toFixed(2)}` : "";
 }
 
-export default function DraftsScreen({ onOpenDraft }: Props) {
+export default function DraftsScreen({ onOpenDraft, onNewInvoice, onViewInvoices, onSignOut }: Props) {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -69,6 +73,15 @@ export default function DraftsScreen({ onOpenDraft }: Props) {
 
   return (
     <View style={styles.root}>
+      <View style={styles.topbarWrap}>
+        <TopBar
+          activeScreen="drafts"
+          onNewInvoice={onNewInvoice}
+          onDrafts={() => {}}
+          onInvoices={onViewInvoices}
+          onSignOut={onSignOut}
+        />
+      </View>
       <Text style={styles.heading}>Saved drafts</Text>
       {drafts.length === 0 ? (
         <View style={styles.empty}>
@@ -109,7 +122,8 @@ export default function DraftsScreen({ onOpenDraft }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#f4f1ea", paddingTop: 56 },
+  root: { flex: 1, backgroundColor: "#f4f1ea" },
+  topbarWrap: { paddingHorizontal: 20, paddingTop: 56, paddingBottom: 4 },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#f4f1ea" },
   heading: { fontSize: 22, fontWeight: "700", color: "#1f1a17", paddingHorizontal: 20, marginBottom: 16 },
   list: { paddingHorizontal: 20, gap: 12, paddingBottom: 40 },
