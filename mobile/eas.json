@@ -1,7 +1,6 @@
 {
   "cli": {
-    "version": ">= 16.0.0",
-    "appVersionSource": "appjson"
+    "version": ">= 16.0.0"
   },
   "build": {
     "preview": {
