@@ -121,6 +121,17 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts }: Props) {
 
   const total = totalFromItems(items);
 
+  function resetForm() {
+    setClientName("");
+    setClientEmail("");
+    setInvoiceNumber("INV-001");
+    setIssueDate(todayIso());
+    setDueDate("");
+    setNotes("");
+    setItems([defaultItem()]);
+    setStatus("");
+  }
+
   async function handleSignOut() {
     await supabase.auth.signOut();
     onSignOut();
@@ -145,6 +156,10 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts }: Props) {
 
       {userEmail ? <Text style={styles.userEmail}>{userEmail}</Text> : null}
       {status ? <Text style={styles.autoSaveStatus}>{status}</Text> : null}
+
+      <Pressable style={styles.newInvoiceBtn} onPress={resetForm}>
+        <Text style={styles.newInvoiceBtnLabel}>+ New invoice</Text>
+      </Pressable>
 
       {/* Business */}
       <Text style={styles.sectionTitle}>Your business</Text>
@@ -244,6 +259,8 @@ const styles = StyleSheet.create({
   topbarBtnLabel: { fontSize: 13, color: "#0d6b61", fontWeight: "600" },
   signOutLink: { fontSize: 13, color: "#675f58" },
   userEmail: { fontSize: 12, color: "#675f58", marginBottom: 8 },
+  newInvoiceBtn: { backgroundColor: "#0d6b61", borderRadius: 10, paddingVertical: 11, paddingHorizontal: 16, alignSelf: "flex-start" },
+  newInvoiceBtnLabel: { color: "#fffdf8", fontSize: 13, fontWeight: "700" },
   autoSaveStatus: { fontSize: 12, color: "#0d6b61", marginBottom: 4 },
   sectionTitle: { fontSize: 13, fontWeight: "700", letterSpacing: 0.5, color: "#1f1a17", marginTop: 12, marginBottom: 2 },
   input: {
