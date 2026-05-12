@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -8,6 +9,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import * as FileSystem from "expo-file-system";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { supabase } from "../lib/supabase";
@@ -49,6 +51,7 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
   const [businessPhone, setBusinessPhone] = useState("");
   const [businessWebsite, setBusinessWebsite] = useState("");
   const [businessAddress, setBusinessAddress] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
   const [clientAddress, setClientAddress] = useState("");
@@ -64,6 +67,7 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
   const [status, setStatus] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { loadProfile(); }, []);
@@ -81,6 +85,7 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
     if (p.businessPhone) setBusinessPhone(p.businessPhone as string);
     if (p.businessWebsite) setBusinessWebsite(p.businessWebsite as string);
     if (p.businessAddress) setBusinessAddress(p.businessAddress as string);
+    if (p.logoUrl !== undefined) setLogoUrl(p.logoUrl as string);
     if (p.clientName) setClientName(p.clientName as string);
     if (p.clientEmail) setClientEmail(p.clientEmail as string);
     if (p.clientAddress) setClientAddress(p.clientAddress as string);
@@ -133,7 +138,7 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
     if (!user) return;
 
     const payload = {
-      businessName, businessEmail, businessPhone, businessWebsite, businessAddress,
+      businessName, businessEmail, businessPhone, businessWebsite, businessAddress, logoUrl,
       clientName, clientEmail, clientAddress,
       invoiceNumber, issueDate, dueDate, currency, taxRate, discount, notes,
       items: items.map((i) => ({
@@ -163,10 +168,10 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
       const lt = (parseFloat(item.quantity) || 0) * (parseFloat(item.rate) || 0);
       return `<tr><td>${item.description || "—"}</td><td style="text-align:center">${item.quantity}</td><td style="text-align:right">${sym}${parseFloat(item.rate || "0").toFixed(2)}</td><td style="text-align:right">${sym}${lt.toFixed(2)}</td></tr>`;
     }).join("");
+    const logoHtml = logoUrl ? `<img src="${logoUrl}" style="max-height:60px;max-width:160px;object-fit:contain;display:block;margin-bottom:8px"/>` : "";
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>
 body{font-family:-apple-system,sans-serif;color:#1f1a17;padding:40px;max-width:680px;margin:0 auto}
-.brand{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#0d6b61;margin-bottom:4px}
-.header{display:flex;justify-content:space-between;margin-bottom:36px}
+.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:36px}
 h1{font-size:28px;margin:0 0 4px}.meta{color:#675f58;font-size:13px;margin:2px 0}
 .parties{display:flex;gap:40px;margin-bottom:32px}
 .party h3{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#9a8f87;margin:0 0 6px}
@@ -178,8 +183,9 @@ td{padding:8px 0;border-bottom:1px solid #e8e0d6;font-size:14px}
 .totals td{padding:4px 0;font-size:14px;border:none}.totals td:last-child{text-align:right}
 .totals .grand td{font-weight:700;font-size:16px;border-top:2px solid #1f1a17;padding-top:8px}
 .notes{margin-top:32px;font-size:13px;color:#675f58;white-space:pre-line}
+.footer{margin-top:48px;border-top:1px solid #e8e0d6;padding-top:12px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#9a8f87;text-align:center}
 </style></head><body>
-<div class="header"><div><p class="brand">cnxt to invoices</p><h1>Invoice</h1>${invoiceNumber ? `<p class="meta">${invoiceNumber}</p>` : ""}</div>
+<div class="header"><div>${logoHtml}<h1>Invoice</h1>${invoiceNumber ? `<p class="meta">${invoiceNumber}</p>` : ""}</div>
 <div style="text-align:right">${issueDate ? `<p class="meta">Issued: ${issueDate}</p>` : ""}${dueDate ? `<p class="meta">Due: ${dueDate}</p>` : ""}</div></div>
 <div class="parties">
 <div class="party"><h3>From</h3>${businessName ? `<p><strong>${businessName}</strong></p>` : ""}${businessEmail ? `<p>${businessEmail}</p>` : ""}${businessPhone ? `<p>${businessPhone}</p>` : ""}${businessWebsite ? `<p>${businessWebsite}</p>` : ""}${businessAddress ? `<p>${businessAddress.replace(/\n/g, "<br/>")}</p>` : ""}</div>
@@ -193,6 +199,7 @@ ${taxAmt > 0 ? `<tr><td>Tax (${taxRate}%)</td><td>${sym}${taxAmt.toFixed(2)}</td
 <tr class="grand"><td>Total (${currency})</td><td>${sym}${total.toFixed(2)}</td></tr>
 </table></div>
 ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
+<div class="footer">Free Invoice Maker | cnxt to invoices</div>
 </body></html>`;
   }
 
@@ -201,7 +208,13 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
     await saveDraft(true);
     try {
       const { uri } = await Print.printToFileAsync({ html: buildInvoiceHtml() });
-      await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: `${invoiceNumber || "invoice"}.pdf`, UTI: "com.adobe.pdf" });
+      const safeName = [businessName, invoiceNumber]
+        .filter(Boolean)
+        .join("_")
+        .replace(/[^a-zA-Z0-9_\-]/g, "_") || "invoice";
+      const destUri = (FileSystem.cacheDirectory ?? "") + safeName + ".pdf";
+      await FileSystem.copyAsync({ from: uri, to: destUri });
+      await Sharing.shareAsync(destUri, { mimeType: "application/pdf", dialogTitle: safeName + ".pdf", UTI: "com.adobe.pdf" });
     } catch { /* user dismissed */ }
     setExporting(false);
   }
@@ -223,6 +236,7 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
     setInvoiceNumber("INV-001"); setIssueDate(todayIso()); setDueDate("");
     setCurrency("USD"); setTaxRate(""); setDiscount("");
     setNotes(""); setItems([defaultItem()]); setStatus(""); setCurrentDraftId(null);
+    setLogoUrl(""); setShowPreview(false);
   }
 
   async function handleSignOut() { await supabase.auth.signOut(); onSignOut(); }
@@ -248,6 +262,8 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
       <TextInput style={styles.input} placeholder="Phone" placeholderTextColor="#9a8f87" keyboardType="phone-pad" value={businessPhone} onChangeText={(v) => { setBusinessPhone(v); scheduleAutoSave(); }} />
       <TextInput style={styles.input} placeholder="Website" placeholderTextColor="#9a8f87" autoCapitalize="none" keyboardType="url" value={businessWebsite} onChangeText={(v) => { setBusinessWebsite(v); scheduleAutoSave(); }} />
       <TextInput style={[styles.input, styles.textarea]} placeholder="Address" placeholderTextColor="#9a8f87" multiline value={businessAddress} onChangeText={(v) => { setBusinessAddress(v); scheduleAutoSave(); }} />
+      <TextInput style={styles.input} placeholder="Logo URL (https://...)" placeholderTextColor="#9a8f87" autoCapitalize="none" keyboardType="url" value={logoUrl} onChangeText={(v) => { setLogoUrl(v); scheduleAutoSave(); }} />
+      {logoUrl ? <Image source={{ uri: logoUrl }} style={styles.logoPreview} resizeMode="contain" /> : null}
 
       <Text style={styles.sectionTitle}>Client</Text>
       <TextInput style={styles.input} placeholder="Client name" placeholderTextColor="#9a8f87" value={clientName} onChangeText={(v) => { setClientName(v); scheduleAutoSave(); }} />
@@ -310,6 +326,66 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
         </View>
       </View>
 
+      <Pressable style={styles.previewToggle} onPress={() => setShowPreview((v) => !v)}>
+        <Text style={styles.previewToggleLabel}>{showPreview ? "Hide preview" : "Preview invoice"}</Text>
+      </Pressable>
+
+      {showPreview && (
+        <View style={styles.previewCard}>
+          <View style={styles.previewHeaderRow}>
+            <View style={{ flex: 1 }}>
+              {logoUrl ? <Image source={{ uri: logoUrl }} style={styles.previewLogo} resizeMode="contain" /> : null}
+              <Text style={styles.previewTitle}>Invoice</Text>
+              {invoiceNumber ? <Text style={styles.previewMeta}>{invoiceNumber}</Text> : null}
+            </View>
+            <View style={{ alignItems: "flex-end" }}>
+              {issueDate ? <Text style={styles.previewMeta}>Issued: {issueDate}</Text> : null}
+              {dueDate ? <Text style={styles.previewMeta}>Due: {dueDate}</Text> : null}
+            </View>
+          </View>
+          <View style={styles.previewParties}>
+            <View style={styles.previewParty}>
+              <Text style={styles.previewPartyLabel}>FROM</Text>
+              {businessName ? <Text style={styles.previewPartyName}>{businessName}</Text> : null}
+              {businessEmail ? <Text style={styles.previewPartySub}>{businessEmail}</Text> : null}
+              {businessPhone ? <Text style={styles.previewPartySub}>{businessPhone}</Text> : null}
+            </View>
+            <View style={styles.previewParty}>
+              <Text style={styles.previewPartyLabel}>TO</Text>
+              {clientName ? <Text style={styles.previewPartyName}>{clientName}</Text> : null}
+              {clientEmail ? <Text style={styles.previewPartySub}>{clientEmail}</Text> : null}
+            </View>
+          </View>
+          <View style={styles.previewDivider} />
+          <View style={styles.previewItemsHeader}>
+            <Text style={[styles.previewItemCol, { flex: 2 }]}>Description</Text>
+            <Text style={[styles.previewItemCol, { width: 40, textAlign: "center" }]}>Qty</Text>
+            <Text style={[styles.previewItemCol, { width: 70, textAlign: "right" }]}>Amount</Text>
+          </View>
+          {items.map((item, idx) => (
+            <View key={idx} style={styles.previewItemRow}>
+              <Text style={[styles.previewItemText, { flex: 2 }]} numberOfLines={1}>{item.description || "—"}</Text>
+              <Text style={[styles.previewItemText, { width: 40, textAlign: "center" }]}>{item.quantity}</Text>
+              <Text style={[styles.previewItemText, { width: 70, textAlign: "right" }]}>{sym}{((parseFloat(item.quantity) || 0) * (parseFloat(item.rate) || 0)).toFixed(2)}</Text>
+            </View>
+          ))}
+          <View style={styles.previewDivider} />
+          {hasBreakdown && (
+            <>
+              <View style={styles.previewTotRow}><Text style={styles.previewTotLabel}>Subtotal</Text><Text style={styles.previewTotVal}>{sym}{subtotal.toFixed(2)}</Text></View>
+              {discountAmt > 0 && <View style={styles.previewTotRow}><Text style={styles.previewTotLabel}>Discount</Text><Text style={styles.previewTotVal}>−{sym}{discountAmt.toFixed(2)}</Text></View>}
+              {taxAmt > 0 && <View style={styles.previewTotRow}><Text style={styles.previewTotLabel}>Tax ({taxRate}%)</Text><Text style={styles.previewTotVal}>{sym}{taxAmt.toFixed(2)}</Text></View>}
+            </>
+          )}
+          <View style={[styles.previewTotRow, { borderTopWidth: 1, borderTopColor: "#1f1a17", marginTop: 4, paddingTop: 8 }]}>
+            <Text style={[styles.previewTotLabel, { fontWeight: "700", color: "#1f1a17" }]}>Total ({currency})</Text>
+            <Text style={[styles.previewTotVal, { fontWeight: "700", color: "#0d6b61", fontSize: 15 }]}>{sym}{total.toFixed(2)}</Text>
+          </View>
+          {notes ? <Text style={styles.previewNotes}>{notes}</Text> : null}
+          <Text style={styles.previewBrand}>Free Invoice Maker | cnxt to invoices</Text>
+        </View>
+      )}
+
       <Pressable style={styles.button} onPress={downloadInvoice} disabled={exporting}>
         {exporting ? <ActivityIndicator color="#fffdf8" /> : <Text style={styles.buttonLabel}>Download invoice</Text>}
       </Pressable>
@@ -356,4 +432,27 @@ const styles = StyleSheet.create({
   button: { backgroundColor: "#0d6b61", borderRadius: 12, paddingVertical: 16, alignItems: "center", marginTop: 8 },
   buttonLabel: { color: "#fffdf8", fontSize: 16, fontWeight: "700" },
   spacer: { height: 40 },
+  logoPreview: { width: 120, height: 40, marginTop: 4 },
+  previewToggle: { borderWidth: 1, borderColor: "#0d6b61", borderRadius: 10, paddingVertical: 11, paddingHorizontal: 16, alignItems: "center", marginTop: 8 },
+  previewToggleLabel: { color: "#0d6b61", fontSize: 14, fontWeight: "600" },
+  previewCard: { backgroundColor: "#fffdf8", borderWidth: 1, borderColor: "#d8cfc3", borderRadius: 12, padding: 16, gap: 4 },
+  previewHeaderRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 12 },
+  previewLogo: { width: 100, height: 30, marginBottom: 4 },
+  previewTitle: { fontSize: 20, fontWeight: "700", color: "#1f1a17" },
+  previewMeta: { fontSize: 12, color: "#675f58", marginTop: 2 },
+  previewParties: { flexDirection: "row", gap: 24, marginBottom: 12 },
+  previewParty: { flex: 1, gap: 2 },
+  previewPartyLabel: { fontSize: 9, letterSpacing: 1, textTransform: "uppercase", color: "#9a8f87", marginBottom: 2 },
+  previewPartyName: { fontSize: 13, fontWeight: "600", color: "#1f1a17" },
+  previewPartySub: { fontSize: 12, color: "#675f58" },
+  previewDivider: { height: 1, backgroundColor: "#d8cfc3", marginVertical: 8 },
+  previewItemsHeader: { flexDirection: "row", marginBottom: 4 },
+  previewItemCol: { fontSize: 9, letterSpacing: 1, textTransform: "uppercase", color: "#9a8f87", fontWeight: "600" },
+  previewItemRow: { flexDirection: "row", paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: "#f0ebe3" },
+  previewItemText: { fontSize: 12, color: "#1f1a17" },
+  previewTotRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 },
+  previewTotLabel: { fontSize: 12, color: "#675f58" },
+  previewTotVal: { fontSize: 12, color: "#675f58" },
+  previewNotes: { marginTop: 8, fontSize: 11, color: "#675f58", fontStyle: "italic" },
+  previewBrand: { marginTop: 12, fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase", color: "#9a8f87", textAlign: "center" },
 });

@@ -63,13 +63,18 @@ export default function App() {
             name="Invoice"
             options={{ headerShown: false }}
           >
-            {(props) => (
-              <InvoiceScreen
-                onSignOut={() => setSession(false)}
-                onViewDrafts={() => props.navigation.navigate("Drafts")}
-                onViewInvoices={() => props.navigation.navigate("Invoices")}
-              />
-            )}
+            {(props) => {
+              const params = props.route.params;
+              return (
+                <InvoiceScreen
+                  onSignOut={() => setSession(false)}
+                  onViewDrafts={() => props.navigation.navigate("Drafts")}
+                  onViewInvoices={() => props.navigation.navigate("Invoices")}
+                  loadDraftId={params?.draftId}
+                  loadDraftPayload={params?.draftPayload}
+                />
+              );
+            }}
           </Stack.Screen>
           <Stack.Screen
             name="Drafts"
@@ -77,7 +82,7 @@ export default function App() {
           >
             {(props) => (
               <DraftsScreen
-                onOpenDraft={() => props.navigation.navigate("Invoice")}
+                onOpenDraft={(draft) => props.navigation.navigate("Invoice", { draftId: draft.id, draftPayload: draft.payload_json })}
                 onNewInvoice={() => props.navigation.navigate("Invoice")}
                 onViewInvoices={() => props.navigation.navigate("Invoices")}
                 onSignOut={() => setSession(false)}
