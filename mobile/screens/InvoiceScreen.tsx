@@ -68,7 +68,6 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
   const [status, setStatus] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
-  const [showPreview, setShowPreview] = useState(true);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { loadProfile(); }, []);
@@ -157,8 +156,25 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
       quality: 0.8,
     });
     if (!result.canceled && result.assets[0]) {
-      setLogoUrl(result.assets[0].uri);
-      scheduleAutoSave();
+      const localUri = result.assets[0].uri;
+      setLogoUrl(localUri);
+      setStatus("Uploading logo...");
+      const uploadedUrl = await uploadLogoToStorage(localUri);
+      if (uploadedUrl) {
+        setLogoUrl(uploadedUrl);
+        const { data: sessionData } = await supabase.auth.getSession();
+        const user = sessionData.session?.user;
+        if (user) {
+          await supabase.from("invoice_business_profiles").upsert(
+            { user_id: user.id, logo_url: uploadedUrl },
+            { onConflict: "user_id" }
+          );
+        }
+        setStatus("Logo saved.");
+      } else {
+        setStatus("Logo upload failed — saved locally only.");
+      }
+      setTimeout(() => setStatus(""), 3000);
     }
   }
 
@@ -172,6 +188,27 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
       return `data:${mime};base64,${b64}`;
     } catch {
       return logoUrl;
+    }
+  }
+
+  async function uploadLogoToStorage(localUri: string): Promise<string | null> {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const user = sessionData.session?.user;
+      if (!user) return null;
+      const ext = localUri.split(".").pop()?.toLowerCase() ?? "jpg";
+      const mime = ext === "png" ? "image/png" : "image/jpeg";
+      const path = `${user.id}/logo.${ext}`;
+      const response = await fetch(localUri);
+      const blob = await response.blob();
+      const { error } = await supabase.storage
+        .from("invoice-logos")
+        .upload(path, blob, { contentType: mime, upsert: true });
+      if (error) return null;
+      const { data: { publicUrl } } = supabase.storage.from("invoice-logos").getPublicUrl(path);
+      return publicUrl;
+    } catch {
+      return null;
     }
   }
 
@@ -299,7 +336,7 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
     setInvoiceNumber("INV-001"); setIssueDate(todayIso()); setDueDate("");
     setCurrency("USD"); setTaxRate(""); setDiscount("");
     setNotes(""); setItems([defaultItem()]); setStatus(""); setCurrentDraftId(null);
-    setLogoUrl(""); setShowPreview(false);
+    setLogoUrl("");
   }
 
   async function handleSignOut() { await supabase.auth.signOut(); onSignOut(); }
@@ -398,15 +435,9 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
         </View>
       </View>
 
-      <Pressable style={styles.previewToggle} onPress={() => setShowPreview((v) => !v)}>
-        <Text style={styles.previewToggleLabel}>{showPreview ? "Hide preview" : "Preview invoice"}</Text>
-      </Pressable>
-
-      {showPreview && (
-        <View style={styles.previewCard}>
+      <View style={styles.previewCard}>
           <View style={styles.previewHeaderRow}>
             <View style={{ flex: 1 }}>
-              {logoUrl ? <Image source={{ uri: logoUrl }} style={styles.previewLogo} resizeMode="contain" /> : null}
               <Text style={styles.previewTitle}>Invoice</Text>
               {invoiceNumber ? <Text style={styles.previewMeta}>{invoiceNumber}</Text> : null}
             </View>
@@ -418,6 +449,7 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
           <View style={styles.previewParties}>
             <View style={styles.previewParty}>
               <Text style={styles.previewPartyLabel}>FROM</Text>
+              {logoUrl ? <Image source={{ uri: logoUrl }} style={styles.previewLogo} resizeMode="contain" /> : null}
               {businessName ? <Text style={styles.previewPartyName}>{businessName}</Text> : null}
               {businessEmail ? <Text style={styles.previewPartySub}>{businessEmail}</Text> : null}
               {businessPhone ? <Text style={styles.previewPartySub}>{businessPhone}</Text> : null}
@@ -455,8 +487,7 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
           </View>
           {notes ? <Text style={styles.previewNotes}>{notes}</Text> : null}
           <Text style={styles.previewBrand}>Free Invoice Maker | cnxt to invoices</Text>
-        </View>
-      )}
+      </View>
 
       <Pressable style={styles.button} onPress={downloadInvoice} disabled={exporting}>
         {exporting ? <ActivityIndicator color="#fffdf8" /> : <Text style={styles.buttonLabel}>Download invoice</Text>}
@@ -510,8 +541,6 @@ const styles = StyleSheet.create({
   chooseLogoBtnLabel: { color: "#1f1a17", fontSize: 13, fontWeight: "500" },
   removeLogoBtn: { paddingVertical: 4, paddingHorizontal: 8 },
   removeLogoBtnLabel: { color: "#c0392b", fontSize: 12 },
-  previewToggle: { borderWidth: 1, borderColor: "#0d6b61", borderRadius: 10, paddingVertical: 11, paddingHorizontal: 16, alignItems: "center", marginTop: 8 },
-  previewToggleLabel: { color: "#0d6b61", fontSize: 14, fontWeight: "600" },
   previewCard: { backgroundColor: "#fffdf8", borderWidth: 1, borderColor: "#d8cfc3", borderRadius: 12, padding: 16, gap: 4 },
   previewHeaderRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 12 },
   previewLogo: { width: 100, height: 30, marginBottom: 4 },

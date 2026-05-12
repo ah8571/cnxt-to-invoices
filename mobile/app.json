@@ -10,9 +10,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0d6b61"
-    },
-    "assetBundlePatterns": [
+      "backgroundColor": "#f4f1ea": [
       "**/*"
     ],
     "android": {
@@ -20,7 +18,7 @@
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0d6b61"
+        "backgroundColor": "#ffffff"
       }
     },
     "ios": {
