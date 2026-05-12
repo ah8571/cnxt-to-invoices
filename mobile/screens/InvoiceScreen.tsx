@@ -275,19 +275,8 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
       if (data?.id) setCurrentDraftId(data.id);
     }
 
-    // Silently persist business profile on every save
-    await supabase.from("invoice_business_profiles").upsert(
-      {
-        user_id: user.id,
-        business_name: businessName,
-        email: businessEmail,
-        phone: businessPhone,
-        website: businessWebsite,
-        address_line_1: businessAddress,
-        ...(logoUrl.startsWith("http") ? { logo_url: logoUrl } : {}),
-      },
-      { onConflict: "user_id" }
-    );
+    // Silently persist business profile on every save (same robust path as saveProfileSilently)
+    await saveProfileSilently();
 
     setStatus(silent ? "Auto-saved." : "Draft saved.");
     setTimeout(() => setStatus(""), 3000);
