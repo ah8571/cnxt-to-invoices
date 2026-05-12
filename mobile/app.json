@@ -5,6 +5,7 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "scheme": "cnxt-to-invoices",
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -19,6 +20,9 @@
       "eas": {
         "projectId": "9255692f-c4e4-4999-89a8-4e0de5f14377"
       }
-    }
+    },
+    "plugins": [
+      "expo-web-browser"
+    ]
   }
 }

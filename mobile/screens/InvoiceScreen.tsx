@@ -205,6 +205,20 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
       if (data?.id) setCurrentDraftId(data.id);
     }
 
+    // Silently persist business profile on every save
+    await supabase.from("invoice_business_profiles").upsert(
+      {
+        user_id: user.id,
+        business_name: businessName,
+        email: businessEmail,
+        phone: businessPhone,
+        website: businessWebsite,
+        address_line_1: businessAddress,
+        ...(logoUrl.startsWith("http") ? { logo_url: logoUrl } : {}),
+      },
+      { onConflict: "user_id" }
+    );
+
     setStatus(silent ? "Auto-saved." : "Draft saved.");
     setTimeout(() => setStatus(""), 3000);
   }
@@ -322,9 +336,6 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
           </Pressable>
         </View>
       ) : null}
-      <Pressable style={styles.saveProfileBtn} onPress={saveProfile}>
-        <Text style={styles.saveProfileBtnLabel}>Save business info</Text>
-      </Pressable>
 
       <Text style={styles.sectionTitle}>Client</Text>
       <TextInput style={styles.input} placeholder="Client name" placeholderTextColor="#9a8f87" value={clientName} onChangeText={(v) => { setClientName(v); scheduleAutoSave(); }} />
@@ -499,8 +510,6 @@ const styles = StyleSheet.create({
   chooseLogoBtnLabel: { color: "#1f1a17", fontSize: 13, fontWeight: "500" },
   removeLogoBtn: { paddingVertical: 4, paddingHorizontal: 8 },
   removeLogoBtnLabel: { color: "#c0392b", fontSize: 12 },
-  saveProfileBtn: { borderWidth: 1, borderColor: "#0d6b61", borderRadius: 10, paddingVertical: 10, paddingHorizontal: 16, alignSelf: "flex-start" },
-  saveProfileBtnLabel: { color: "#0d6b61", fontSize: 13, fontWeight: "600" },
   previewToggle: { borderWidth: 1, borderColor: "#0d6b61", borderRadius: 10, paddingVertical: 11, paddingHorizontal: 16, alignItems: "center", marginTop: 8 },
   previewToggleLabel: { color: "#0d6b61", fontSize: 14, fontWeight: "600" },
   previewCard: { backgroundColor: "#fffdf8", borderWidth: 1, borderColor: "#d8cfc3", borderRadius: 12, padding: 16, gap: 4 },
