@@ -113,7 +113,7 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
 
     const { data } = await supabase
       .from("invoice_business_profiles")
-      .select("business_name, email, phone, website, address_line_1")
+      .select("business_name, email, phone, website, address_line_1, logo_url")
       .eq("user_id", user.id)
       .limit(1)
       .single();
@@ -124,7 +124,28 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
       if (data.phone) setBusinessPhone(data.phone);
       if (data.website) setBusinessWebsite(data.website);
       if (data.address_line_1) setBusinessAddress(data.address_line_1);
+      if (data.logo_url) setLogoUrl(data.logo_url);
     }
+  }
+
+  async function saveProfile() {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const user = sessionData.session?.user;
+    if (!user) return;
+    await supabase.from("invoice_business_profiles").upsert(
+      {
+        user_id: user.id,
+        business_name: businessName,
+        email: businessEmail,
+        phone: businessPhone,
+        website: businessWebsite,
+        address_line_1: businessAddress,
+        logo_url: logoUrl,
+      },
+      { onConflict: "user_id" }
+    );
+    setStatus("Business info saved.");
+    setTimeout(() => setStatus(""), 3000);
   }
 
   function scheduleAutoSave() {
@@ -264,6 +285,9 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
       <TextInput style={[styles.input, styles.textarea]} placeholder="Address" placeholderTextColor="#9a8f87" multiline value={businessAddress} onChangeText={(v) => { setBusinessAddress(v); scheduleAutoSave(); }} />
       <TextInput style={styles.input} placeholder="Logo URL (https://...)" placeholderTextColor="#9a8f87" autoCapitalize="none" keyboardType="url" value={logoUrl} onChangeText={(v) => { setLogoUrl(v); scheduleAutoSave(); }} />
       {logoUrl ? <Image source={{ uri: logoUrl }} style={styles.logoPreview} resizeMode="contain" /> : null}
+      <Pressable style={styles.saveProfileBtn} onPress={saveProfile}>
+        <Text style={styles.saveProfileBtnLabel}>Save business info</Text>
+      </Pressable>
 
       <Text style={styles.sectionTitle}>Client</Text>
       <TextInput style={styles.input} placeholder="Client name" placeholderTextColor="#9a8f87" value={clientName} onChangeText={(v) => { setClientName(v); scheduleAutoSave(); }} />
@@ -433,6 +457,8 @@ const styles = StyleSheet.create({
   buttonLabel: { color: "#fffdf8", fontSize: 16, fontWeight: "700" },
   spacer: { height: 40 },
   logoPreview: { width: 120, height: 40, marginTop: 4 },
+  saveProfileBtn: { borderWidth: 1, borderColor: "#0d6b61", borderRadius: 10, paddingVertical: 10, paddingHorizontal: 16, alignSelf: "flex-start" },
+  saveProfileBtnLabel: { color: "#0d6b61", fontSize: 13, fontWeight: "600" },
   previewToggle: { borderWidth: 1, borderColor: "#0d6b61", borderRadius: 10, paddingVertical: 11, paddingHorizontal: 16, alignItems: "center", marginTop: 8 },
   previewToggleLabel: { color: "#0d6b61", fontSize: 14, fontWeight: "600" },
   previewCard: { backgroundColor: "#fffdf8", borderWidth: 1, borderColor: "#d8cfc3", borderRadius: 12, padding: 16, gap: 4 },
