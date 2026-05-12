@@ -73,9 +73,8 @@ a {
 }
 
 .nav-logo {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  height: 18px;
+  width: auto;
   flex-shrink: 0;
 }
 
