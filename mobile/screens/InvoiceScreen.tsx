@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
   removeLogoBtnLabel: { color: "#c0392b", fontSize: 12 },
   previewCard: { backgroundColor: "#fffdf8", borderWidth: 1, borderColor: "#d8cfc3", borderRadius: 12, padding: 16, gap: 4 },
   previewHeaderRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 12 },
-  previewLogo: { width: 100, height: 30, marginBottom: 4 },
+  previewLogo: { width: 100, height: 30, marginBottom: 4, alignSelf: "flex-start" },
   previewTitle: { fontSize: 20, fontWeight: "700", color: "#1f1a17" },
   previewMeta: { fontSize: 12, color: "#675f58", marginTop: 2 },
   previewParties: { flexDirection: "row", gap: 24, marginBottom: 12 },
