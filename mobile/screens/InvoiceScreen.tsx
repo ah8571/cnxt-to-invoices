@@ -203,10 +203,10 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
       const response = await fetch(localUri);
       const blob = await response.blob();
       const { error } = await supabase.storage
-        .from("invoice-logos")
+        .from("logos")
         .upload(path, blob, { contentType: mime, upsert: true });
       if (error) return null;
-      const { data: { publicUrl } } = supabase.storage.from("invoice-logos").getPublicUrl(path);
+      const { data: { publicUrl } } = supabase.storage.from("logos").getPublicUrl(path);
       return publicUrl;
     } catch {
       return null;
