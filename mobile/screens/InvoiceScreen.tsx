@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import * as FileSystem from "expo-file-system";
+import * as ImagePicker from "expo-image-picker";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { supabase } from "../lib/supabase";
@@ -67,7 +68,7 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
   const [status, setStatus] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
-  const [showPreview, setShowPreview] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { loadProfile(); }, []);
@@ -140,12 +141,38 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
         phone: businessPhone,
         website: businessWebsite,
         address_line_1: businessAddress,
-        logo_url: logoUrl,
+        // Only persist http(s) logo URLs — local file URIs are device-scoped and can't be saved to DB
+        ...(logoUrl.startsWith("http") ? { logo_url: logoUrl } : {}),
       },
       { onConflict: "user_id" }
     );
     setStatus("Business info saved.");
     setTimeout(() => setStatus(""), 3000);
+  }
+
+  async function pickLogo() {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setLogoUrl(result.assets[0].uri);
+      scheduleAutoSave();
+    }
+  }
+
+  async function buildLogoDataUri(): Promise<string> {
+    if (!logoUrl) return "";
+    if (logoUrl.startsWith("http")) return logoUrl;
+    try {
+      const b64 = await FileSystem.readAsStringAsync(logoUrl, { encoding: FileSystem.EncodingType.Base64 });
+      const ext = logoUrl.split(".").pop()?.toLowerCase() ?? "jpeg";
+      const mime = ext === "png" ? "image/png" : ext === "gif" ? "image/gif" : "image/jpeg";
+      return `data:${mime};base64,${b64}`;
+    } catch {
+      return logoUrl;
+    }
   }
 
   function scheduleAutoSave() {
@@ -182,14 +209,15 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
     setTimeout(() => setStatus(""), 3000);
   }
 
-  function buildInvoiceHtml() {
+  async function buildInvoiceHtml(): Promise<string> {
     const sym = CURRENCY_SYMBOLS[currency];
     const { subtotal, discountAmt, taxAmt, total } = calcTotals(items, taxRate, discount);
     const rows = items.map((item) => {
       const lt = (parseFloat(item.quantity) || 0) * (parseFloat(item.rate) || 0);
       return `<tr><td>${item.description || "—"}</td><td style="text-align:center">${item.quantity}</td><td style="text-align:right">${sym}${parseFloat(item.rate || "0").toFixed(2)}</td><td style="text-align:right">${sym}${lt.toFixed(2)}</td></tr>`;
     }).join("");
-    const logoHtml = logoUrl ? `<img src="${logoUrl}" style="max-height:60px;max-width:160px;object-fit:contain;display:block;margin-bottom:8px"/>` : "";
+    const resolvedLogo = await buildLogoDataUri();
+    const logoHtml = resolvedLogo ? `<img src="${resolvedLogo}" style="max-height:60px;max-width:160px;object-fit:contain;display:block;margin-bottom:8px"/>` : "";
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>
 body{font-family:-apple-system,sans-serif;color:#1f1a17;padding:40px;max-width:680px;margin:0 auto}
 .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:36px}
@@ -228,7 +256,7 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
     setExporting(true);
     await saveDraft(true);
     try {
-      const { uri } = await Print.printToFileAsync({ html: buildInvoiceHtml() });
+      const { uri } = await Print.printToFileAsync({ html: await buildInvoiceHtml() });
       const safeName = [businessName, invoiceNumber]
         .filter(Boolean)
         .join("_")
@@ -283,8 +311,17 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
       <TextInput style={styles.input} placeholder="Phone" placeholderTextColor="#9a8f87" keyboardType="phone-pad" value={businessPhone} onChangeText={(v) => { setBusinessPhone(v); scheduleAutoSave(); }} />
       <TextInput style={styles.input} placeholder="Website" placeholderTextColor="#9a8f87" autoCapitalize="none" keyboardType="url" value={businessWebsite} onChangeText={(v) => { setBusinessWebsite(v); scheduleAutoSave(); }} />
       <TextInput style={[styles.input, styles.textarea]} placeholder="Address" placeholderTextColor="#9a8f87" multiline value={businessAddress} onChangeText={(v) => { setBusinessAddress(v); scheduleAutoSave(); }} />
-      <TextInput style={styles.input} placeholder="Logo URL (https://...)" placeholderTextColor="#9a8f87" autoCapitalize="none" keyboardType="url" value={logoUrl} onChangeText={(v) => { setLogoUrl(v); scheduleAutoSave(); }} />
-      {logoUrl ? <Image source={{ uri: logoUrl }} style={styles.logoPreview} resizeMode="contain" /> : null}
+      <Pressable style={styles.chooseLogoBtn} onPress={pickLogo}>
+        <Text style={styles.chooseLogoBtnLabel}>{logoUrl ? "Change logo" : "Choose logo"}</Text>
+      </Pressable>
+      {logoUrl ? (
+        <View style={styles.logoRow}>
+          <Image source={{ uri: logoUrl }} style={styles.logoPreview} resizeMode="contain" />
+          <Pressable onPress={() => { setLogoUrl(""); scheduleAutoSave(); }} style={styles.removeLogoBtn}>
+            <Text style={styles.removeLogoBtnLabel}>Remove</Text>
+          </Pressable>
+        </View>
+      ) : null}
       <Pressable style={styles.saveProfileBtn} onPress={saveProfile}>
         <Text style={styles.saveProfileBtnLabel}>Save business info</Text>
       </Pressable>
@@ -456,7 +493,12 @@ const styles = StyleSheet.create({
   button: { backgroundColor: "#0d6b61", borderRadius: 12, paddingVertical: 16, alignItems: "center", marginTop: 8 },
   buttonLabel: { color: "#fffdf8", fontSize: 16, fontWeight: "700" },
   spacer: { height: 40 },
-  logoPreview: { width: 120, height: 40, marginTop: 4 },
+  logoPreview: { width: 120, height: 40 },
+  logoRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  chooseLogoBtn: { borderWidth: 1, borderColor: "#d8cfc3", borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, alignSelf: "flex-start", backgroundColor: "#fffdf8" },
+  chooseLogoBtnLabel: { color: "#1f1a17", fontSize: 13, fontWeight: "500" },
+  removeLogoBtn: { paddingVertical: 4, paddingHorizontal: 8 },
+  removeLogoBtnLabel: { color: "#c0392b", fontSize: 12 },
   saveProfileBtn: { borderWidth: 1, borderColor: "#0d6b61", borderRadius: 10, paddingVertical: 10, paddingHorizontal: 16, alignSelf: "flex-start" },
   saveProfileBtnLabel: { color: "#0d6b61", fontSize: 13, fontWeight: "600" },
   previewToggle: { borderWidth: 1, borderColor: "#0d6b61", borderRadius: 10, paddingVertical: 11, paddingHorizontal: 16, alignItems: "center", marginTop: 8 },
