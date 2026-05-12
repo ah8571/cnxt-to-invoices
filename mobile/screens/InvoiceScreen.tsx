@@ -69,6 +69,7 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
   const [userEmail, setUserEmail] = useState("");
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const profileSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { loadProfile(); }, []);
 
@@ -217,6 +218,38 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
     autoSaveTimer.current = setTimeout(() => saveDraft(true), 5000);
   }
 
+  function scheduleProfileSave() {
+    if (profileSaveTimer.current) clearTimeout(profileSaveTimer.current);
+    profileSaveTimer.current = setTimeout(() => saveProfileSilently(), 3000);
+  }
+
+  async function saveProfileSilently() {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const user = sessionData.session?.user;
+    if (!user) return;
+    const profileData = {
+      user_id: user.id,
+      business_name: businessName,
+      email: businessEmail,
+      phone: businessPhone,
+      website: businessWebsite,
+      address_line_1: businessAddress,
+      ...(logoUrl.startsWith("http") ? { logo_url: logoUrl } : {}),
+    };
+    // Select first so we can INSERT or UPDATE explicitly (avoids RLS upsert issues)
+    const { data: existing } = await supabase
+      .from("invoice_business_profiles")
+      .select("user_id")
+      .eq("user_id", user.id)
+      .limit(1)
+      .single();
+    if (existing) {
+      await supabase.from("invoice_business_profiles").update(profileData).eq("user_id", user.id);
+    } else {
+      await supabase.from("invoice_business_profiles").insert(profileData);
+    }
+  }
+
   async function saveDraft(silent = false) {
     const { data: sessionData } = await supabase.auth.getSession();
     const user = sessionData.session?.user;
@@ -305,8 +338,8 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
 
   async function downloadInvoice() {
     setExporting(true);
-    await saveDraft(true);
     try {
+      await saveDraft(true);
       const { uri } = await Print.printToFileAsync({ html: await buildInvoiceHtml() });
       const safeName = [businessName, invoiceNumber]
         .filter(Boolean)
@@ -315,7 +348,13 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
       const destUri = (FileSystem.cacheDirectory ?? "") + safeName + ".pdf";
       await FileSystem.copyAsync({ from: uri, to: destUri });
       await Sharing.shareAsync(destUri, { mimeType: "application/pdf", dialogTitle: safeName + ".pdf", UTI: "com.adobe.pdf" });
-    } catch { /* user dismissed */ }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!msg.toLowerCase().includes("dismiss") && !msg.toLowerCase().includes("cancel")) {
+        setStatus("Export failed: " + msg);
+        setTimeout(() => setStatus(""), 6000);
+      }
+    }
     setExporting(false);
   }
 
@@ -336,7 +375,8 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
     setInvoiceNumber("INV-001"); setIssueDate(todayIso()); setDueDate("");
     setCurrency("USD"); setTaxRate(""); setDiscount("");
     setNotes(""); setItems([defaultItem()]); setStatus(""); setCurrentDraftId(null);
-    setLogoUrl("");
+    // Business fields (name, email, phone, website, address, logo) are intentionally
+    // preserved so the user doesn't have to re-enter them for each invoice.
   }
 
   async function handleSignOut() { await supabase.auth.signOut(); onSignOut(); }
@@ -357,11 +397,11 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
       </Pressable>
 
       <Text style={styles.sectionTitle}>Your business</Text>
-      <TextInput style={styles.input} placeholder="Business name" placeholderTextColor="#9a8f87" value={businessName} onChangeText={(v) => { setBusinessName(v); scheduleAutoSave(); }} />
-      <TextInput style={styles.input} placeholder="Email" placeholderTextColor="#9a8f87" keyboardType="email-address" autoCapitalize="none" value={businessEmail} onChangeText={(v) => { setBusinessEmail(v); scheduleAutoSave(); }} />
-      <TextInput style={styles.input} placeholder="Phone" placeholderTextColor="#9a8f87" keyboardType="phone-pad" value={businessPhone} onChangeText={(v) => { setBusinessPhone(v); scheduleAutoSave(); }} />
-      <TextInput style={styles.input} placeholder="Website" placeholderTextColor="#9a8f87" autoCapitalize="none" keyboardType="url" value={businessWebsite} onChangeText={(v) => { setBusinessWebsite(v); scheduleAutoSave(); }} />
-      <TextInput style={[styles.input, styles.textarea]} placeholder="Address" placeholderTextColor="#9a8f87" multiline value={businessAddress} onChangeText={(v) => { setBusinessAddress(v); scheduleAutoSave(); }} />
+      <TextInput style={styles.input} placeholder="Business name" placeholderTextColor="#9a8f87" value={businessName} onChangeText={(v) => { setBusinessName(v); scheduleAutoSave(); scheduleProfileSave(); }} />
+      <TextInput style={styles.input} placeholder="Email" placeholderTextColor="#9a8f87" keyboardType="email-address" autoCapitalize="none" value={businessEmail} onChangeText={(v) => { setBusinessEmail(v); scheduleAutoSave(); scheduleProfileSave(); }} />
+      <TextInput style={styles.input} placeholder="Phone" placeholderTextColor="#9a8f87" keyboardType="phone-pad" value={businessPhone} onChangeText={(v) => { setBusinessPhone(v); scheduleAutoSave(); scheduleProfileSave(); }} />
+      <TextInput style={styles.input} placeholder="Website" placeholderTextColor="#9a8f87" autoCapitalize="none" keyboardType="url" value={businessWebsite} onChangeText={(v) => { setBusinessWebsite(v); scheduleAutoSave(); scheduleProfileSave(); }} />
+      <TextInput style={[styles.input, styles.textarea]} placeholder="Address" placeholderTextColor="#9a8f87" multiline value={businessAddress} onChangeText={(v) => { setBusinessAddress(v); scheduleAutoSave(); scheduleProfileSave(); }} />
       <Pressable style={styles.chooseLogoBtn} onPress={pickLogo}>
         <Text style={styles.chooseLogoBtnLabel}>{logoUrl ? "Change logo" : "Choose logo"}</Text>
       </Pressable>
