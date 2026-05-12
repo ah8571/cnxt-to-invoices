@@ -334,9 +334,7 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
         .filter(Boolean)
         .join("_")
         .replace(/[^a-zA-Z0-9_\-]/g, "_") || "invoice";
-      const destUri = (FileSystem.cacheDirectory ?? "") + safeName + ".pdf";
-      await FileSystem.copyAsync({ from: uri, to: destUri });
-      await Sharing.shareAsync(destUri, { mimeType: "application/pdf", dialogTitle: safeName + ".pdf", UTI: "com.adobe.pdf" });
+      await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: safeName + ".pdf", UTI: "com.adobe.pdf" });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       if (!msg.toLowerCase().includes("dismiss") && !msg.toLowerCase().includes("cancel")) {
