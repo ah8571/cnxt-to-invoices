@@ -4,14 +4,24 @@
     "slug": "cnxt-to-invoice-mobile",
     "version": "0.1.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "scheme": "cnxt-to-invoices",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0d6b61"
+    },
     "assetBundlePatterns": [
       "**/*"
     ],
     "android": {
       "package": "to.cnxt.invoices",
-      "versionCode": 1
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0d6b61"
+      }
     },
     "ios": {
       "bundleIdentifier": "to.cnxt.invoices"
