@@ -388,13 +388,15 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
         .filter(Boolean)
         .join("_")
         .replace(/[^a-zA-Z0-9_\-]/g, "_") || "invoice";
-      // Try to rename file for a cleaner filename; fall back to original uri if deprecated API fails
+      // Move temp file to a named path; if destination already exists, delete it first
       let shareUri = uri;
       try {
         const destUri = (FileSystem.cacheDirectory ?? "") + safeName + ".pdf";
-        await FileSystem.copyAsync({ from: uri, to: destUri });
+        const existing = await FileSystem.getInfoAsync(destUri);
+        if (existing.exists) await FileSystem.deleteAsync(destUri, { idempotent: true });
+        await FileSystem.moveAsync({ from: uri, to: destUri });
         shareUri = destUri;
-      } catch { /* copyAsync deprecated on this SDK version, share with UUID name */ }
+      } catch { /* fall back to UUID-named temp file */ }
       await Sharing.shareAsync(shareUri, { mimeType: "application/pdf", dialogTitle: safeName + ".pdf", UTI: "com.adobe.pdf" });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
