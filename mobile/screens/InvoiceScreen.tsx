@@ -400,8 +400,8 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
       }
     }
 
-    // Insert invoice row — throw on error so caller can surface it to the user
-    const { data: inv, error: invError } = await supabase.from("invoices").insert({
+    // Upsert invoice row — handles re-downloads of the same invoice number gracefully
+    const { data: inv, error: invError } = await supabase.from("invoices").upsert({
       user_id: user.id,
       business_profile_id: businessProfileId,
       client_id: clientId,
@@ -412,7 +412,7 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
       total_cents: totalCents,
       status: "sent",
       notes,
-    }).select("id").single();
+    }, { onConflict: "user_id,invoice_number" }).select("id").single();
 
     if (invError) {
       Sentry.captureException(new Error(invError.message), {
@@ -423,6 +423,8 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
     }
 
     if (inv?.id) {
+      // Delete existing line items so re-downloads don't create duplicates
+      await supabase.from("invoice_items").delete().eq("invoice_id", inv.id);
       const lineItems = items
         .filter((i) => i.description || i.rate)
         .map((i) => ({
