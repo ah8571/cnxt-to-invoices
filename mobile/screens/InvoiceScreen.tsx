@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
@@ -174,14 +174,17 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
             .limit(1)
             .single();
           if (existing) {
-            await supabase.from("invoice_business_profiles").update({ logo_url: uploadedUrl }).eq("user_id", user.id);
+            const { error: updateErr } = await supabase.from("invoice_business_profiles").update({ logo_url: uploadedUrl }).eq("user_id", user.id);
+            if (updateErr) setStatus(`Logo DB error: ${updateErr.code} — ${updateErr.message}`);
+            else setStatus("Logo saved.");
           } else {
-            await supabase.from("invoice_business_profiles").insert({ user_id: user.id, logo_url: uploadedUrl });
+            const { error: insertErr } = await supabase.from("invoice_business_profiles").insert({ user_id: user.id, logo_url: uploadedUrl });
+            if (insertErr) setStatus(`Logo DB error: ${insertErr.code} — ${insertErr.message}`);
+            else setStatus("Logo saved.");
           }
         }
-        setStatus("Logo saved.");
       } else {
-        setStatus("Logo upload failed — check storage bucket permissions.");
+        setStatus("Logo upload failed — check Supabase Storage › logos bucket RLS policies.");
       }
       setTimeout(() => setStatus(""), 3000);
     }
