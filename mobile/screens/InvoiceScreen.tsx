@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react-native";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -207,6 +208,7 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
       return `data:${mime};base64,${b64}`;
     } catch (e) {
       // Propagate so downloadInvoice can surface the error
+      Sentry.captureException(e, { tags: { location: "buildLogoDataUri" } });
       throw new Error("Logo encode failed: " + (e instanceof Error ? e.message : String(e)));
     }
   }
@@ -239,6 +241,7 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
       const { data: { publicUrl } } = supabase.storage.from("logos").getPublicUrl(storagePath);
       return publicUrl;
     } catch (e) {
+      Sentry.captureException(e, { tags: { location: "uploadLogoToStorage" } });
       console.error("uploadLogoToStorage error:", e);
       return null;
     }
@@ -400,7 +403,13 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
       notes,
     }).select("id").single();
 
-    if (invError) throw new Error(`invoices insert: ${invError.code} — ${invError.message}`);
+    if (invError) {
+      Sentry.captureException(new Error(invError.message), {
+        tags: { location: "saveInvoiceRecord", supabase_code: invError.code },
+        extra: { invoiceNumber, clientName, totalCents },
+      });
+      throw new Error(`invoices insert: ${invError.code} — ${invError.message}`);
+    }
 
     if (inv?.id) {
       const lineItems = items

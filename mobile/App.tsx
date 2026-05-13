@@ -1,7 +1,15 @@
+import * as Sentry from "@sentry/react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
+
+Sentry.init({
+  dsn: "https://2681c17429bc51f4bf11e6939f827279@o4511383545184256.ingest.us.sentry.io/4511383549575168",
+  tracesSampleRate: 0.2,
+  environment: __DEV__ ? "development" : "production",
+  enabled: !__DEV__, // only send events in production/preview builds
+});
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import AuthScreen from "./screens/AuthScreen";
 import DraftsScreen from "./screens/DraftsScreen";
@@ -17,7 +25,7 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-export default function App() {
+function App() {
   const [session, setSession] = useState<boolean | null>(null); // null = loading
 
   useEffect(() => {
@@ -106,3 +114,5 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
+
+export default Sentry.wrap(App);
