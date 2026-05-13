@@ -18,7 +18,7 @@ import InvoicesScreen from "./screens/InvoicesScreen";
 import { supabase } from "./lib/supabase";
 
 export type RootStackParamList = {
-  Invoice: { draftId?: string; draftPayload?: Record<string, unknown> } | undefined;
+  Invoice: { draftId?: string; draftPayload?: Record<string, unknown>; invoiceId?: string } | undefined;
   Drafts: undefined;
   Invoices: undefined;
 };
@@ -80,6 +80,7 @@ function App() {
                   onViewInvoices={() => props.navigation.navigate("Invoices")}
                   loadDraftId={params?.draftId}
                   loadDraftPayload={params?.draftPayload}
+                  loadInvoiceId={params?.invoiceId}
                 />
               );
             }}
@@ -106,6 +107,7 @@ function App() {
                 onNewInvoice={() => props.navigation.navigate("Invoice")}
                 onDrafts={() => props.navigation.navigate("Drafts")}
                 onSignOut={() => setSession(false)}
+                onEditInvoice={(id) => props.navigation.navigate("Invoice", { invoiceId: id })}
               />
             )}
           </Stack.Screen>

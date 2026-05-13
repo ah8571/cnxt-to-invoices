@@ -2,6 +2,7 @@ import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -24,6 +25,7 @@ type Props = {
   onNewInvoice: () => void;
   onDrafts: () => void;
   onSignOut: () => void;
+  onEditInvoice: (id: string) => void;
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -36,7 +38,10 @@ const STATUS_COLORS: Record<string, string> = {
 
 function formatDate(value: string | null) {
   if (!value) return "";
-  return new Date(value).toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" });
+  // Parse as local date — new Date("YYYY-MM-DD") is UTC midnight which shows the
+  // previous day in negative-offset timezones.
+  const [y, mo, d] = value.split("-").map(Number);
+  return new Date(y, mo - 1, d).toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" });
 }
 
 function formatMoney(cents: number | null, currency: string | null) {
@@ -45,7 +50,7 @@ function formatMoney(cents: number | null, currency: string | null) {
   return `${sym}${((cents || 0) / 100).toFixed(2)}`;
 }
 
-export default function InvoicesScreen({ onNewInvoice, onDrafts, onSignOut }: Props) {
+export default function InvoicesScreen({ onNewInvoice, onDrafts, onSignOut, onEditInvoice }: Props) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -125,6 +130,12 @@ export default function InvoicesScreen({ onNewInvoice, onDrafts, onSignOut }: Pr
                       {statusKey.charAt(0).toUpperCase() + statusKey.slice(1)}
                     </Text>
                   </View>
+                  <Pressable
+                    onPress={() => onEditInvoice(item.id)}
+                    style={({ pressed }) => [styles.editBtn, pressed && { opacity: 0.6 }]}
+                  >
+                    <Text style={styles.editBtnText}>Edit</Text>
+                  </Pressable>
                 </View>
               </View>
             );
@@ -157,6 +168,14 @@ const styles = StyleSheet.create({
   cardDate: { fontSize: 12, color: "#9a8f87" },
   badge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
   badgeText: { fontSize: 11, fontWeight: "600" },
+  editBtn: {
+    marginLeft: "auto",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    backgroundColor: "#0d6b6122",
+  },
+  editBtnText: { fontSize: 12, fontWeight: "600", color: "#0d6b61" },
   empty: {
     margin: 20,
     padding: 20,

@@ -25,6 +25,7 @@ type Props = {
   onViewInvoices?: () => void;
   loadDraftId?: string;
   loadDraftPayload?: Record<string, unknown>;
+  loadInvoiceId?: string;
 };
 
 const CURRENCIES = ["USD", "EUR", "GBP", "CAD"] as const;
@@ -44,10 +45,14 @@ function defaultItem(): LineItem {
 }
 
 function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
 }
 
-export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices, loadDraftId, loadDraftPayload }: Props) {
+export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices, loadDraftId, loadDraftPayload, loadInvoiceId }: Props) {
   const [businessName, setBusinessName] = useState("");
   const [businessEmail, setBusinessEmail] = useState("");
   const [businessPhone, setBusinessPhone] = useState("");
@@ -69,10 +74,16 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
   const [status, setStatus] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
+  const [invoiceRecordId, setInvoiceRecordId] = useState<string | null>(null);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const profileSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => { loadProfile(); }, []);
+  useEffect(() => {
+    loadProfile();
+    if (!loadDraftPayload && !loadInvoiceId) {
+      loadNextInvoiceNumber();
+    }
+  }, []);
 
   useEffect(() => {
     if (loadDraftPayload) {
@@ -80,6 +91,12 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
       setCurrentDraftId(loadDraftId ?? null);
     }
   }, [loadDraftPayload, loadDraftId]);
+
+  useEffect(() => {
+    if (loadInvoiceId) {
+      loadInvoiceRecord(loadInvoiceId);
+    }
+  }, [loadInvoiceId]);
 
   function loadFromPayload(p: Record<string, unknown>) {
     if (p.businessName) setBusinessName(p.businessName as string);
@@ -127,6 +144,56 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
       if (data.website) setBusinessWebsite(data.website);
       if (data.address_line_1) setBusinessAddress(data.address_line_1);
       if (data.logo_url) setLogoUrl(data.logo_url);
+    }
+  }
+
+  async function loadNextInvoiceNumber() {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const user = sessionData.session?.user;
+    if (!user) return;
+    const { data } = await supabase
+      .from("invoices")
+      .select("invoice_number")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+    if (data?.invoice_number) {
+      const match = data.invoice_number.match(/^(.*?)(\d+)$/);
+      if (match) {
+        const prefix = match[1];
+        const digits = match[2];
+        const next = String(parseInt(digits, 10) + 1).padStart(digits.length, "0");
+        setInvoiceNumber(`${prefix}${next}`);
+        return;
+      }
+    }
+    setInvoiceNumber("INV-001");
+  }
+
+  async function loadInvoiceRecord(id: string) {
+    const { data } = await supabase
+      .from("invoices")
+      .select("invoice_number, issue_date, due_date, currency, notes, status, invoice_clients(client_name, email), invoice_items(description, quantity, unit_price_cents)")
+      .eq("id", id)
+      .single();
+    if (!data) return;
+    setInvoiceRecordId(id);
+    if (data.invoice_number) setInvoiceNumber(data.invoice_number);
+    if (data.issue_date) setIssueDate(data.issue_date);
+    if (data.due_date) setDueDate(data.due_date as string);
+    if (data.currency && (CURRENCIES as readonly string[]).includes(data.currency)) setCurrency(data.currency as Currency);
+    if (data.notes) setNotes(data.notes);
+    const client = Array.isArray(data.invoice_clients) ? data.invoice_clients[0] : data.invoice_clients as { client_name: string | null; email: string | null } | null;
+    if (client?.client_name) setClientName(client.client_name);
+    if (client?.email) setClientEmail(client.email);
+    const rawItems = Array.isArray(data.invoice_items) ? data.invoice_items : [];
+    if (rawItems.length > 0) {
+      setItems(rawItems.map((i: { description: string | null; quantity: number | null; unit_price_cents: number | null }) => ({
+        description: i.description || "",
+        quantity: String(i.quantity || 1),
+        rate: String(((i.unit_price_cents || 0) / 100).toFixed(2)),
+      })));
     }
   }
 
@@ -400,35 +467,64 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
       }
     }
 
-    // Upsert invoice row — handles re-downloads of the same invoice number gracefully
-    const { data: inv, error: invError } = await supabase.from("invoices").upsert({
-      user_id: user.id,
-      business_profile_id: businessProfileId,
-      client_id: clientId,
-      invoice_number: invoiceNumber,
-      issue_date: issueDate || null,
-      due_date: dueDate || null,
-      currency,
-      total_cents: totalCents,
-      status: "sent",
-      notes,
-    }, { onConflict: "user_id,invoice_number" }).select("id").single();
-
-    if (invError) {
-      Sentry.captureException(new Error(invError.message), {
-        tags: { location: "saveInvoiceRecord", supabase_code: invError.code },
-        extra: { invoiceNumber, clientName, totalCents },
-      });
-      throw new Error(`invoices insert: ${invError.code} — ${invError.message}`);
+    // UPDATE existing invoice or INSERT new one
+    let finalInvId: string | null = null;
+    if (invoiceRecordId) {
+      const { data: updated, error: updErr } = await supabase
+        .from("invoices")
+        .update({
+          business_profile_id: businessProfileId,
+          client_id: clientId,
+          invoice_number: invoiceNumber,
+          issue_date: issueDate || null,
+          due_date: dueDate || null,
+          currency,
+          total_cents: totalCents,
+          notes,
+        })
+        .eq("id", invoiceRecordId)
+        .select("id")
+        .single();
+      if (updErr) {
+        Sentry.captureException(new Error(updErr.message), {
+          tags: { location: "saveInvoiceRecord/update", supabase_code: updErr.code },
+          extra: { invoiceNumber, clientName, totalCents },
+        });
+        throw new Error(`invoices update: ${updErr.code} — ${updErr.message}`);
+      }
+      finalInvId = updated?.id ?? invoiceRecordId;
+    } else {
+      const { data: inv, error: invError } = await supabase.from("invoices").upsert({
+        user_id: user.id,
+        business_profile_id: businessProfileId,
+        client_id: clientId,
+        invoice_number: invoiceNumber,
+        issue_date: issueDate || null,
+        due_date: dueDate || null,
+        currency,
+        total_cents: totalCents,
+        status: "sent",
+        notes,
+      }, { onConflict: "user_id,invoice_number" }).select("id").single();
+      if (invError) {
+        Sentry.captureException(new Error(invError.message), {
+          tags: { location: "saveInvoiceRecord/insert", supabase_code: invError.code },
+          extra: { invoiceNumber, clientName, totalCents },
+        });
+        throw new Error(`invoices insert: ${invError.code} — ${invError.message}`);
+      }
+      if (inv?.id) setInvoiceRecordId(inv.id);
+      finalInvId = inv?.id ?? null;
     }
 
-    if (inv?.id) {
+    if (finalInvId) {
+      const invId = finalInvId;
       // Delete existing line items so re-downloads don't create duplicates
-      await supabase.from("invoice_items").delete().eq("invoice_id", inv.id);
+      await supabase.from("invoice_items").delete().eq("invoice_id", invId);
       const lineItems = items
         .filter((i) => i.description || i.rate)
         .map((i) => ({
-          invoice_id: inv.id,
+          invoice_id: invId,
           description: i.description,
           quantity: parseFloat(i.quantity) || 1,
           unit_price_cents: Math.round((parseFloat(i.rate) || 0) * 100),
