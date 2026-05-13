@@ -440,31 +440,41 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
       .single();
     const businessProfileId: string | null = profile?.id ?? null;
 
-    // Get or create client — wrapped so a client failure never blocks the invoice insert
+    // Get or create client, updating email if it changed
     let clientId: string | null = null;
+    let clientSaveError: string | null = null;
     if (clientName) {
-      try {
-        const { data: existingClient } = await supabase
+      const { data: existingClient } = await supabase
+        .from("invoice_clients")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("client_name", clientName)
+        .limit(1)
+        .maybeSingle();
+      if (existingClient?.id) {
+        clientId = existingClient.id;
+        // Update email in case it changed
+        await supabase
           .from("invoice_clients")
+          .update({ email: clientEmail || null })
+          .eq("id", clientId);
+      } else {
+        const { data: newClient, error: clientErr } = await supabase
+          .from("invoice_clients")
+          .insert({ user_id: user.id, client_name: clientName, email: clientEmail || null })
           .select("id")
-          .eq("user_id", user.id)
-          .eq("client_name", clientName)
-          .limit(1)
           .single();
-        if (existingClient?.id) {
-          clientId = existingClient.id;
-        } else {
-          const { data: newClient, error: clientErr } = await supabase
-            .from("invoice_clients")
-            .insert({ user_id: user.id, client_name: clientName, email: clientEmail })
-            .select("id")
-            .single();
-          if (clientErr) console.warn("invoice_clients insert error:", clientErr);
-          clientId = newClient?.id ?? null;
+        if (clientErr) {
+          Sentry.captureException(new Error(clientErr.message), {
+            tags: { location: "saveInvoiceRecord/client", supabase_code: clientErr.code },
+          });
+          clientSaveError = `Client save failed (${clientErr.code}): ${clientErr.message}`;
         }
-      } catch (e) {
-        console.warn("Client lookup/insert failed, proceeding without clientId:", e);
+        clientId = newClient?.id ?? null;
       }
+    }
+    if (clientSaveError) {
+      throw new Error(clientSaveError);
     }
 
     // UPDATE existing invoice or INSERT new one
@@ -543,12 +553,20 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
 
       // Save to invoices table — show error but don't block PDF generation
       const { total } = calcTotals(items, taxRate, discount);
+      let invoiceSavedOk = false;
       try {
         await saveInvoiceRecord(Math.round(total * 100));
+        invoiceSavedOk = true;
       } catch (e: unknown) {
         const dbMsg = e instanceof Error ? e.message : String(e);
         setStatus("DB error: " + dbMsg);
         setTimeout(() => setStatus(""), 10000);
+      }
+
+      // Remove the draft once the invoice is officially saved
+      if (invoiceSavedOk && currentDraftId) {
+        await supabase.from("invoice_drafts").delete().eq("id", currentDraftId);
+        setCurrentDraftId(null);
       }
 
       // Build PDF — logo errors are now thrown so we can surface them
@@ -620,9 +638,11 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
     setClientName(""); setClientEmail(""); setClientAddress("");
     setInvoiceNumber("INV-001"); setIssueDate(todayIso()); setDueDate("");
     setCurrency("USD"); setTaxRate(""); setDiscount("");
-    setNotes(""); setItems([defaultItem()]); setStatus(""); setCurrentDraftId(null);
+    setNotes(""); setItems([defaultItem()]); setStatus("");
+    setCurrentDraftId(null); setInvoiceRecordId(null);
     // Business fields (name, email, phone, website, address, logo) are intentionally
     // preserved so the user doesn't have to re-enter them for each invoice.
+    loadNextInvoiceNumber();
   }
 
   async function handleSignOut() { await supabase.auth.signOut(); onSignOut(); }

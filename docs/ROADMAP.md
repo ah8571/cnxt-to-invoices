@@ -85,6 +85,33 @@ Allow users to attach a Stripe-hosted payment link to their invoice, so clients 
 
 ---
 
+### Shareable invoice links
+
+Instead of (or alongside) sharing a PDF, let users send a URL that opens the invoice in any browser — no app, no download required. Option B below is the recommended path given the existing infrastructure.
+
+**Option B — Cloudflare Worker route (recommended)**
+
+The stack already includes a Cloudflare Worker (`cnxt-to-links`) and all invoice data lives in Supabase. A new route like `/i/:id` would:
+
+1. Add a `public` boolean column to the `invoices` Supabase table (default `false`). Only invoices the user explicitly shares are accessible.
+2. Add a `/i/:id` route in the Worker that queries Supabase (using the service role key stored as a Worker secret) for the invoice row, client, line items, and logo URL.
+3. Render the same HTML template already used by the mobile app's `buildInvoiceHtml()` — consistent layout, no extra design work.
+4. Return the HTML directly from the Worker so `cnxt.to/i/abc123` opens a live, branded invoice page.
+5. In the mobile app, after saving the invoice record, set `public = true` and build the share URL from the UUID. Surface a "Copy link" / "Share link" button alongside the existing Download PDF button.
+6. **PDF from the link page** — the recipient's browser view includes a "Download PDF" button that calls `window.print()` (or a `/i/:id/pdf` Worker route using a headless renderer) so the recipient can get a PDF without needing the app at all.
+
+**Why this is relatively straightforward:**
+- The Worker infrastructure already exists
+- The HTML template is already written and tested
+- Supabase already stores all the data needed to reconstruct the invoice
+- No new auth or payment scope required
+
+**What it is not:**
+- Not a payment flow — the link is read-only for the recipient
+- Not mandatory — the PDF download path stays unchanged for users who prefer it
+
+---
+
 ## Out of scope (intentionally)
 
 - Recurring invoice automation (complex, better suited to dedicated billing tools)
