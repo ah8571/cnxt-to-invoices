@@ -33,7 +33,13 @@
     },
     "plugins": [
       "expo-web-browser",
-      "@sentry/react-native"
+      [
+        "@sentry/react-native",
+        {
+          "organization": "cnxt-to",
+          "project": "react-native"
+        }
+      ]
     ]
   }
 }
