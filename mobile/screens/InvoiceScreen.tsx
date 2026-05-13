@@ -461,7 +461,7 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
       } else {
         const { data: newClient, error: clientErr } = await supabase
           .from("invoice_clients")
-          .insert({ user_id: user.id, client_name: clientName, email: clientEmail || null })
+            .insert({ user_id: user.id, business_profile_id: businessProfileId, client_name: clientName, email: clientEmail || null })
           .select("id")
           .single();
         if (clientErr) {
