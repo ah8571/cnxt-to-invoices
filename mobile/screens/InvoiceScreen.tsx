@@ -163,13 +163,21 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
       const uploadedUrl = await uploadLogoToStorage(localUri);
       if (uploadedUrl) {
         setLogoUrl(uploadedUrl);
+        // Persist logo_url with SELECT+INSERT/UPDATE to avoid RLS issues on first save
         const { data: sessionData } = await supabase.auth.getSession();
         const user = sessionData.session?.user;
         if (user) {
-          await supabase.from("invoice_business_profiles").upsert(
-            { user_id: user.id, logo_url: uploadedUrl },
-            { onConflict: "user_id" }
-          );
+          const { data: existing } = await supabase
+            .from("invoice_business_profiles")
+            .select("user_id")
+            .eq("user_id", user.id)
+            .limit(1)
+            .single();
+          if (existing) {
+            await supabase.from("invoice_business_profiles").update({ logo_url: uploadedUrl }).eq("user_id", user.id);
+          } else {
+            await supabase.from("invoice_business_profiles").insert({ user_id: user.id, logo_url: uploadedUrl });
+          }
         }
         setStatus("Logo saved.");
       } else {
@@ -182,18 +190,16 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
   async function buildLogoDataUri(): Promise<string> {
     if (!logoUrl) return "";
     try {
+      let localPath = logoUrl;
       if (logoUrl.startsWith("http")) {
-        // Fetch remote URL as base64 — expo-print WebView can't load external images
-        const response = await fetch(logoUrl);
-        const blob = await response.blob();
-        return await new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(blob);
-        });
+        // FileReader is a browser-only API; download to a temp file then read as base64
+        const ext = logoUrl.split(".").pop()?.split("?")[0]?.toLowerCase() ?? "jpg";
+        const tempPath = (FileSystem.cacheDirectory ?? "") + `logo_pdf_tmp.${ext}`;
+        const { uri: downloaded } = await FileSystem.downloadAsync(logoUrl, tempPath);
+        localPath = downloaded;
       }
-      const b64 = await FileSystem.readAsStringAsync(logoUrl, { encoding: FileSystem.EncodingType.Base64 });
-      const ext = logoUrl.split(".").pop()?.toLowerCase() ?? "jpeg";
+      const b64 = await FileSystem.readAsStringAsync(localPath, { encoding: FileSystem.EncodingType.Base64 });
+      const ext = localPath.split(".").pop()?.toLowerCase() ?? "jpeg";
       const mime = ext === "png" ? "image/png" : ext === "gif" ? "image/gif" : "image/jpeg";
       return `data:${mime};base64,${b64}`;
     } catch {
@@ -338,14 +344,28 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
     const user = sessionData.session?.user;
     if (!user) return;
 
-    // Upsert client
+    // Get or create client — avoid upsert w/ onConflict since the unique constraint may not exist
     let clientId: string | null = null;
     if (clientName) {
-      const { data: clientData } = await supabase
+      const { data: existingClient } = await supabase
         .from("invoice_clients")
-        .upsert({ user_id: user.id, client_name: clientName, email: clientEmail, address_line_1: clientAddress }, { onConflict: "user_id,client_name" })
-        .select("id").single();
-      clientId = clientData?.id ?? null;
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("client_name", clientName)
+        .limit(1)
+        .single();
+      if (existingClient?.id) {
+        clientId = existingClient.id;
+        // Update contact details in case they changed
+        await supabase.from("invoice_clients").update({ email: clientEmail, address_line_1: clientAddress }).eq("id", existingClient.id);
+      } else {
+        const { data: newClient } = await supabase
+          .from("invoice_clients")
+          .insert({ user_id: user.id, client_name: clientName, email: clientEmail, address_line_1: clientAddress })
+          .select("id")
+          .single();
+        clientId = newClient?.id ?? null;
+      }
     }
 
     // Insert invoice row
