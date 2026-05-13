@@ -181,14 +181,23 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
 
   async function buildLogoDataUri(): Promise<string> {
     if (!logoUrl) return "";
-    if (logoUrl.startsWith("http")) return logoUrl;
     try {
+      if (logoUrl.startsWith("http")) {
+        // Fetch remote URL as base64 — expo-print WebView can't load external images
+        const response = await fetch(logoUrl);
+        const blob = await response.blob();
+        return await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+      }
       const b64 = await FileSystem.readAsStringAsync(logoUrl, { encoding: FileSystem.EncodingType.Base64 });
       const ext = logoUrl.split(".").pop()?.toLowerCase() ?? "jpeg";
       const mime = ext === "png" ? "image/png" : ext === "gif" ? "image/gif" : "image/jpeg";
       return `data:${mime};base64,${b64}`;
     } catch {
-      return logoUrl;
+      return "";
     }
   }
 
@@ -290,7 +299,6 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
       return `<tr><td>${item.description || "—"}</td><td style="text-align:center">${item.quantity}</td><td style="text-align:right">${sym}${parseFloat(item.rate || "0").toFixed(2)}</td><td style="text-align:right">${sym}${lt.toFixed(2)}</td></tr>`;
     }).join("");
     const resolvedLogo = await buildLogoDataUri();
-    const logoHtml = resolvedLogo ? `<img src="${resolvedLogo}" style="max-height:60px;max-width:160px;object-fit:contain;display:block;margin-bottom:8px"/>` : "";
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>
 body{font-family:-apple-system,sans-serif;color:#1f1a17;padding:40px;max-width:680px;margin:0 auto}
 .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:36px}
@@ -307,10 +315,10 @@ td{padding:8px 0;border-bottom:1px solid #e8e0d6;font-size:14px}
 .notes{margin-top:32px;font-size:13px;color:#675f58;white-space:pre-line}
 .footer{margin-top:48px;border-top:1px solid #e8e0d6;padding-top:12px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#9a8f87;text-align:center}
 </style></head><body>
-<div class="header"><div>${logoHtml}<h1>Invoice</h1>${invoiceNumber ? `<p class="meta">${invoiceNumber}</p>` : ""}</div>
+<div class="header"><div><h1>Invoice</h1>${invoiceNumber ? `<p class="meta">${invoiceNumber}</p>` : ""}</div>
 <div style="text-align:right">${issueDate ? `<p class="meta">Issued: ${issueDate}</p>` : ""}${dueDate ? `<p class="meta">Due: ${dueDate}</p>` : ""}</div></div>
 <div class="parties">
-<div class="party"><h3>From</h3>${businessName ? `<p><strong>${businessName}</strong></p>` : ""}${businessEmail ? `<p>${businessEmail}</p>` : ""}${businessPhone ? `<p>${businessPhone}</p>` : ""}${businessWebsite ? `<p>${businessWebsite}</p>` : ""}${businessAddress ? `<p>${businessAddress.replace(/\n/g, "<br/>")}</p>` : ""}</div>
+<div class="party"><h3>From</h3>${resolvedLogo ? `<img src="${resolvedLogo}" style="max-height:50px;max-width:140px;object-fit:contain;display:block;margin-bottom:6px"/>` : ""}${businessName ? `<p><strong>${businessName}</strong></p>` : ""}${businessEmail ? `<p>${businessEmail}</p>` : ""}${businessPhone ? `<p>${businessPhone}</p>` : ""}${businessWebsite ? `<p>${businessWebsite}</p>` : ""}${businessAddress ? `<p>${businessAddress.replace(/\n/g, "<br/>")}</p>` : ""}</div>
 <div class="party"><h3>To</h3>${clientName ? `<p><strong>${clientName}</strong></p>` : ""}${clientEmail ? `<p>${clientEmail}</p>` : ""}${clientAddress ? `<p>${clientAddress.replace(/\n/g, "<br/>")}</p>` : ""}</div>
 </div>
 <table><thead><tr><th>Description</th><th style="text-align:center">Qty</th><th style="text-align:right">Rate</th><th style="text-align:right">Total</th></tr></thead><tbody>${rows}</tbody></table>
@@ -325,16 +333,69 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
 </body></html>`;
   }
 
+  async function saveInvoiceRecord(totalCents: number) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const user = sessionData.session?.user;
+    if (!user) return;
+
+    // Upsert client
+    let clientId: string | null = null;
+    if (clientName) {
+      const { data: clientData } = await supabase
+        .from("invoice_clients")
+        .upsert({ user_id: user.id, client_name: clientName, email: clientEmail, address_line_1: clientAddress }, { onConflict: "user_id,client_name" })
+        .select("id").single();
+      clientId = clientData?.id ?? null;
+    }
+
+    // Insert invoice row
+    const { data: inv } = await supabase.from("invoices").insert({
+      user_id: user.id,
+      client_id: clientId,
+      invoice_number: invoiceNumber,
+      issue_date: issueDate || null,
+      due_date: dueDate || null,
+      currency,
+      total_cents: totalCents,
+      status: "sent",
+      notes,
+    }).select("id").single();
+
+    if (inv?.id) {
+      const lineItems = items
+        .filter((i) => i.description || i.rate)
+        .map((i) => ({
+          invoice_id: inv.id,
+          description: i.description,
+          quantity: parseFloat(i.quantity) || 1,
+          unit_price_cents: Math.round((parseFloat(i.rate) || 0) * 100),
+          total_cents: Math.round((parseFloat(i.quantity) || 1) * (parseFloat(i.rate) || 0) * 100),
+        }));
+      if (lineItems.length > 0) {
+        await supabase.from("invoice_items").insert(lineItems);
+      }
+    }
+  }
+
   async function downloadInvoice() {
     setExporting(true);
     try {
       await saveDraft(true);
+      const { total } = calcTotals(items, taxRate, discount);
+      await saveInvoiceRecord(Math.round(total * 100));
       const { uri } = await Print.printToFileAsync({ html: await buildInvoiceHtml() });
       const safeName = [businessName, invoiceNumber]
         .filter(Boolean)
         .join("_")
         .replace(/[^a-zA-Z0-9_\-]/g, "_") || "invoice";
-      await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: safeName + ".pdf", UTI: "com.adobe.pdf" });
+      // Try to rename file for a cleaner filename; fall back to original uri if deprecated API fails
+      let shareUri = uri;
+      try {
+        const destUri = (FileSystem.cacheDirectory ?? "") + safeName + ".pdf";
+        await FileSystem.copyAsync({ from: uri, to: destUri });
+        shareUri = destUri;
+      } catch { /* copyAsync deprecated on this SDK version, share with UUID name */ }
+      await Sharing.shareAsync(shareUri, { mimeType: "application/pdf", dialogTitle: safeName + ".pdf", UTI: "com.adobe.pdf" });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       if (!msg.toLowerCase().includes("dismiss") && !msg.toLowerCase().includes("cancel")) {
