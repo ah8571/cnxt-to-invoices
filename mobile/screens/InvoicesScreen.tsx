@@ -21,6 +21,7 @@ type Invoice = {
 };
 
 type Props = {
+  onNewInvoice: () => void;
   onDrafts: () => void;
   onSignOut: () => void;
 };
@@ -44,9 +45,10 @@ function formatMoney(cents: number | null, currency: string | null) {
   return `${sym}${((cents || 0) / 100).toFixed(2)}`;
 }
 
-export default function InvoicesScreen({ onDrafts, onSignOut }: Props) {
+export default function InvoicesScreen({ onNewInvoice, onDrafts, onSignOut }: Props) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   useFocusEffect(
     useCallback(() => {
@@ -56,17 +58,19 @@ export default function InvoicesScreen({ onDrafts, onSignOut }: Props) {
 
   async function loadInvoices() {
     setLoading(true);
+    setLoadError("");
     const { data: sessionData } = await supabase.auth.getSession();
     const user = sessionData.session?.user;
     if (!user) { setLoading(false); return; }
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("invoices")
       .select("id, invoice_number, issue_date, currency, total_cents, status, client:invoice_clients (client_name)")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
-    setInvoices((data as Invoice[]) || []);
+    if (error) setLoadError(`Load error: ${error.code} — ${error.message}`);
+    setInvoices((data as unknown as Invoice[]) || []);
     setLoading(false);
   }
 
@@ -83,12 +87,14 @@ export default function InvoicesScreen({ onDrafts, onSignOut }: Props) {
       <View style={styles.topbarWrap}>
         <TopBar
           activeScreen="invoices"
+          onNewInvoice={onNewInvoice}
           onDrafts={onDrafts}
           onInvoices={() => {}}
           onSignOut={onSignOut}
         />
       </View>
       <Text style={styles.heading}>Previous invoices</Text>
+      {loadError ? <Text style={{ color: "#c0392b", marginHorizontal: 20, marginBottom: 8, fontSize: 13 }}>{loadError}</Text> : null}
       {invoices.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyText}>No saved invoices yet. Download a PDF from the invoice editor and it will appear here.</Text>

@@ -181,7 +181,7 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
         }
         setStatus("Logo saved.");
       } else {
-        setStatus("Logo upload failed — saved locally only.");
+        setStatus("Logo upload failed — check storage bucket permissions.");
       }
       setTimeout(() => setStatus(""), 3000);
     }
@@ -197,7 +197,7 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
         const { uri: downloaded } = await FileSystem.downloadAsync(logoUrl, tempPath);
         localPath = downloaded;
       }
-      const b64 = await FileSystem.readAsStringAsync(localPath, { encoding: FileSystem.EncodingType.Base64 });
+      const b64 = await FileSystem.readAsStringAsync(localPath, { encoding: "base64" });
       // Detect MIME from original URL (temp file has no extension after downloadAsync)
       const srcUrl = logoUrl.split("?")[0].toLowerCase();
       const mime = srcUrl.endsWith(".png") ? "image/png" : srcUrl.endsWith(".gif") ? "image/gif" : "image/jpeg";
@@ -231,7 +231,7 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
         },
       });
       if (result.status !== 200 && result.status !== 201) {
-        throw new Error(`HTTP ${result.status}: ${result.body}`);
+        throw new Error(`Upload HTTP ${result.status}: ${result.body}`);
       }
       const { data: { publicUrl } } = supabase.storage.from("logos").getPublicUrl(storagePath);
       return publicUrl;
