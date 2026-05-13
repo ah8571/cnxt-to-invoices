@@ -192,18 +192,19 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
     try {
       let localPath = logoUrl;
       if (logoUrl.startsWith("http")) {
-        // FileReader is a browser-only API; download to a temp file then read as base64
-        const ext = logoUrl.split(".").pop()?.split("?")[0]?.toLowerCase() ?? "jpg";
-        const tempPath = (FileSystem.cacheDirectory ?? "") + `logo_pdf_tmp.${ext}`;
+        // Download remote URL to a temp file first — PDF renderer has no network access
+        const tempPath = (FileSystem.cacheDirectory ?? "") + "logo_pdf_tmp";
         const { uri: downloaded } = await FileSystem.downloadAsync(logoUrl, tempPath);
         localPath = downloaded;
       }
       const b64 = await FileSystem.readAsStringAsync(localPath, { encoding: FileSystem.EncodingType.Base64 });
-      const ext = localPath.split(".").pop()?.toLowerCase() ?? "jpeg";
-      const mime = ext === "png" ? "image/png" : ext === "gif" ? "image/gif" : "image/jpeg";
+      // Detect MIME from original URL (temp file has no extension after downloadAsync)
+      const srcUrl = logoUrl.split("?")[0].toLowerCase();
+      const mime = srcUrl.endsWith(".png") ? "image/png" : srcUrl.endsWith(".gif") ? "image/gif" : "image/jpeg";
       return `data:${mime};base64,${b64}`;
-    } catch {
-      return "";
+    } catch (e) {
+      // Propagate so downloadInvoice can surface the error
+      throw new Error("Logo encode failed: " + (e instanceof Error ? e.message : String(e)));
     }
   }
 
@@ -212,18 +213,30 @@ export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices,
       const { data: sessionData } = await supabase.auth.getSession();
       const user = sessionData.session?.user;
       if (!user) return null;
-      const ext = localUri.split(".").pop()?.toLowerCase() ?? "jpg";
+      const cleanUri = localUri.split("?")[0];
+      const ext = cleanUri.split(".").pop()?.toLowerCase() ?? "jpg";
       const mime = ext === "png" ? "image/png" : "image/jpeg";
-      const path = `${user.id}/logo.${ext}`;
-      const response = await fetch(localUri);
-      const blob = await response.blob();
-      const { error } = await supabase.storage
-        .from("logos")
-        .upload(path, blob, { contentType: mime, upsert: true });
-      if (error) return null;
-      const { data: { publicUrl } } = supabase.storage.from("logos").getPublicUrl(path);
+      const storagePath = `${user.id}/logo.${ext}`;
+      const accessToken = sessionData.session?.access_token;
+      // FileSystem.uploadAsync is the only reliable upload path in Expo React Native
+      // (fetch+blob is broken for local file URIs on many Android devices)
+      const uploadUrl = `https://jstojewashwoswsskwjk.supabase.co/storage/v1/object/logos/${storagePath}`;
+      const result = await FileSystem.uploadAsync(uploadUrl, localUri, {
+        httpMethod: "POST",
+        uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+        headers: {
+          "Content-Type": mime,
+          "Authorization": `Bearer ${accessToken}`,
+          "x-upsert": "true",
+        },
+      });
+      if (result.status !== 200 && result.status !== 201) {
+        throw new Error(`HTTP ${result.status}: ${result.body}`);
+      }
+      const { data: { publicUrl } } = supabase.storage.from("logos").getPublicUrl(storagePath);
       return publicUrl;
-    } catch {
+    } catch (e) {
+      console.error("uploadLogoToStorage error:", e);
       return null;
     }
   }
@@ -344,32 +357,35 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
     const user = sessionData.session?.user;
     if (!user) return;
 
-    // Get or create client — avoid upsert w/ onConflict since the unique constraint may not exist
+    // Get or create client — wrapped so a client failure never blocks the invoice insert
     let clientId: string | null = null;
     if (clientName) {
-      const { data: existingClient } = await supabase
-        .from("invoice_clients")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("client_name", clientName)
-        .limit(1)
-        .single();
-      if (existingClient?.id) {
-        clientId = existingClient.id;
-        // Update contact details in case they changed
-        await supabase.from("invoice_clients").update({ email: clientEmail, address_line_1: clientAddress }).eq("id", existingClient.id);
-      } else {
-        const { data: newClient } = await supabase
+      try {
+        const { data: existingClient } = await supabase
           .from("invoice_clients")
-          .insert({ user_id: user.id, client_name: clientName, email: clientEmail, address_line_1: clientAddress })
           .select("id")
+          .eq("user_id", user.id)
+          .eq("client_name", clientName)
+          .limit(1)
           .single();
-        clientId = newClient?.id ?? null;
+        if (existingClient?.id) {
+          clientId = existingClient.id;
+        } else {
+          const { data: newClient, error: clientErr } = await supabase
+            .from("invoice_clients")
+            .insert({ user_id: user.id, client_name: clientName, email: clientEmail })
+            .select("id")
+            .single();
+          if (clientErr) console.warn("invoice_clients insert error:", clientErr);
+          clientId = newClient?.id ?? null;
+        }
+      } catch (e) {
+        console.warn("Client lookup/insert failed, proceeding without clientId:", e);
       }
     }
 
-    // Insert invoice row
-    const { data: inv } = await supabase.from("invoices").insert({
+    // Insert invoice row — throw on error so caller can surface it to the user
+    const { data: inv, error: invError } = await supabase.from("invoices").insert({
       user_id: user.id,
       client_id: clientId,
       invoice_number: invoiceNumber,
@@ -380,6 +396,8 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
       status: "sent",
       notes,
     }).select("id").single();
+
+    if (invError) throw new Error(`invoices insert: ${invError.code} — ${invError.message}`);
 
     if (inv?.id) {
       const lineItems = items
@@ -401,14 +419,46 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
     setExporting(true);
     try {
       await saveDraft(true);
+
+      // Save to invoices table — show error but don't block PDF generation
       const { total } = calcTotals(items, taxRate, discount);
-      await saveInvoiceRecord(Math.round(total * 100));
-      const { uri } = await Print.printToFileAsync({ html: await buildInvoiceHtml() });
+      try {
+        await saveInvoiceRecord(Math.round(total * 100));
+      } catch (e: unknown) {
+        const dbMsg = e instanceof Error ? e.message : String(e);
+        setStatus("DB error: " + dbMsg);
+        setTimeout(() => setStatus(""), 10000);
+      }
+
+      // Build PDF — logo errors are now thrown so we can surface them
+      let html = "";
+      try {
+        html = await buildInvoiceHtml();
+      } catch (e: unknown) {
+        const logoMsg = e instanceof Error ? e.message : String(e);
+        setStatus("PDF warning: " + logoMsg + " — generating without logo");
+        setTimeout(() => setStatus(""), 8000);
+        // Temporarily blank logoUrl for this render so buildInvoiceHtml skips the img
+        html = await (async () => {
+          const saved = logoUrl;
+          // Inline fallback: build HTML without logo
+          const sym = CURRENCY_SYMBOLS[currency];
+          const { subtotal, discountAmt, taxAmt, total: t } = calcTotals(items, taxRate, discount);
+          const rows = items.map((item) => {
+            const lt = (parseFloat(item.quantity) || 0) * (parseFloat(item.rate) || 0);
+            return `<tr><td>${item.description || "—"}</td><td style="text-align:center">${item.quantity}</td><td style="text-align:right">${sym}${parseFloat(item.rate || "0").toFixed(2)}</td><td style="text-align:right">${sym}${lt.toFixed(2)}</td></tr>`;
+          }).join("");
+          void saved;
+          return `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><h1>Invoice ${invoiceNumber}</h1><p>From: ${businessName}</p><p>To: ${clientName}</p><table>${rows}</table><p>Total: ${sym}${t.toFixed(2)}</p></body></html>`;
+        })();
+      }
+
+      const { uri } = await Print.printToFileAsync({ html });
       const safeName = [businessName, invoiceNumber]
         .filter(Boolean)
         .join("_")
         .replace(/[^a-zA-Z0-9_\-]/g, "_") || "invoice";
-      // Move temp file to a named path; if destination already exists, delete it first
+      // Move temp file to a named path for a clean filename
       let shareUri = uri;
       try {
         const destUri = (FileSystem.cacheDirectory ?? "") + safeName + ".pdf";
@@ -416,7 +466,12 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
         if (existing.exists) await FileSystem.deleteAsync(destUri, { idempotent: true });
         await FileSystem.moveAsync({ from: uri, to: destUri });
         shareUri = destUri;
-      } catch { /* fall back to UUID-named temp file */ }
+      } catch (e) {
+        // Surface so we can see what's blocking the rename
+        const mvMsg = e instanceof Error ? e.message : String(e);
+        setStatus("Rename error (will share as UUID): " + mvMsg);
+        setTimeout(() => setStatus(""), 8000);
+      }
       await Sharing.shareAsync(shareUri, { mimeType: "application/pdf", dialogTitle: safeName + ".pdf", UTI: "com.adobe.pdf" });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
