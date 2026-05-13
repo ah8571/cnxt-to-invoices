@@ -363,6 +363,16 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
     const user = sessionData.session?.user;
     if (!user) return;
 
+    // Ensure business profile exists and get its id
+    await saveProfileSilently();
+    const { data: profile } = await supabase
+      .from("invoice_business_profiles")
+      .select("id")
+      .eq("user_id", user.id)
+      .limit(1)
+      .single();
+    const businessProfileId: string | null = profile?.id ?? null;
+
     // Get or create client — wrapped so a client failure never blocks the invoice insert
     let clientId: string | null = null;
     if (clientName) {
@@ -393,6 +403,7 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
     // Insert invoice row — throw on error so caller can surface it to the user
     const { data: inv, error: invError } = await supabase.from("invoices").insert({
       user_id: user.id,
+      business_profile_id: businessProfileId,
       client_id: clientId,
       invoice_number: invoiceNumber,
       issue_date: issueDate || null,
