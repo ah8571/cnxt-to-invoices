@@ -13,12 +13,12 @@ Sentry.init({
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import AuthScreen from "./screens/AuthScreen";
 import DraftsScreen from "./screens/DraftsScreen";
-import InvoiceScreen from "./screens/InvoiceScreen";
+import CreateInvoiceScreen from "./screens/CreateInvoiceScreen";
 import InvoicesScreen from "./screens/InvoicesScreen";
 import { supabase } from "./lib/supabase";
 
 export type RootStackParamList = {
-  Invoice: { draftId?: string; draftPayload?: Record<string, unknown>; invoiceId?: string } | undefined;
+  CreateInvoice: { draftId?: string; draftPayload?: Record<string, unknown>; invoiceId?: string } | undefined;
   Drafts: undefined;
   Invoices: undefined;
 };
@@ -60,7 +60,7 @@ function App() {
     <SafeAreaProvider>
       <NavigationContainer>
         <Stack.Navigator
-          initialRouteName="Invoice"
+          initialRouteName="CreateInvoice"
           screenOptions={{
             headerStyle: { backgroundColor: "#f4f1ea" },
             headerTintColor: "#0d6b61",
@@ -68,13 +68,13 @@ function App() {
           }}
         >
           <Stack.Screen
-            name="Invoice"
+            name="CreateInvoice"
             options={{ headerShown: false }}
           >
             {(props) => {
               const params = props.route.params;
               return (
-                <InvoiceScreen
+                <CreateInvoiceScreen
                   onSignOut={() => setSession(false)}
                   onViewDrafts={() => props.navigation.navigate("Drafts")}
                   onViewInvoices={() => props.navigation.navigate("Invoices")}
@@ -91,8 +91,8 @@ function App() {
           >
             {(props) => (
               <DraftsScreen
-                onOpenDraft={(draft) => props.navigation.navigate("Invoice", { draftId: draft.id, draftPayload: draft.payload_json })}
-                onNewInvoice={() => props.navigation.navigate("Invoice")}
+                onOpenDraft={(draft) => props.navigation.navigate("CreateInvoice", { draftId: draft.id, draftPayload: draft.payload_json })}
+                onNewInvoice={() => props.navigation.navigate("CreateInvoice")}
                 onViewInvoices={() => props.navigation.navigate("Invoices")}
                 onSignOut={() => setSession(false)}
               />
@@ -104,10 +104,10 @@ function App() {
           >
             {(props) => (
               <InvoicesScreen
-                onNewInvoice={() => props.navigation.navigate("Invoice")}
+                onNewInvoice={() => props.navigation.navigate("CreateInvoice")}
                 onDrafts={() => props.navigation.navigate("Drafts")}
                 onSignOut={() => setSession(false)}
-                onEditInvoice={(id) => props.navigation.navigate("Invoice", { invoiceId: id })}
+                onEditInvoice={(id) => props.navigation.navigate("CreateInvoice", { invoiceId: id })}
               />
             )}
           </Stack.Screen>

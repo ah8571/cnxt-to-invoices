@@ -52,7 +52,7 @@ function todayIso() {
   return `${y}-${m}-${dd}`;
 }
 
-export default function InvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices, loadDraftId, loadDraftPayload, loadInvoiceId }: Props) {
+export default function CreateInvoiceScreen({ onSignOut, onViewDrafts, onViewInvoices, loadDraftId, loadDraftPayload, loadInvoiceId }: Props) {
   const [businessName, setBusinessName] = useState("");
   const [businessEmail, setBusinessEmail] = useState("");
   const [businessPhone, setBusinessPhone] = useState("");
