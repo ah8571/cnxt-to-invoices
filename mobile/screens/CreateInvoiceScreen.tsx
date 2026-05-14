@@ -324,10 +324,10 @@ export default function CreateInvoiceScreen({ onSignOut, onViewDrafts, onViewInv
     profileSaveTimer.current = setTimeout(() => saveProfileSilently(), 3000);
   }
 
-  async function saveProfileSilently() {
+  async function saveProfileSilently(): Promise<string | null> {
     const { data: sessionData } = await supabase.auth.getSession();
     const user = sessionData.session?.user;
-    if (!user) return;
+    if (!user) return null;
     const profileData = {
       user_id: user.id,
       business_name: businessName,
@@ -340,14 +340,20 @@ export default function CreateInvoiceScreen({ onSignOut, onViewDrafts, onViewInv
     // Select first so we can INSERT or UPDATE explicitly (avoids RLS upsert issues)
     const { data: existing } = await supabase
       .from("invoice_business_profiles")
-      .select("user_id")
+      .select("id")
       .eq("user_id", user.id)
       .limit(1)
       .single();
-    if (existing) {
+    if (existing?.id) {
       await supabase.from("invoice_business_profiles").update(profileData).eq("user_id", user.id);
+      return existing.id as string;
     } else {
-      await supabase.from("invoice_business_profiles").insert(profileData);
+      const { data: inserted } = await supabase
+        .from("invoice_business_profiles")
+        .insert(profileData)
+        .select("id")
+        .single();
+      return inserted?.id ?? null;
     }
   }
 
@@ -430,15 +436,11 @@ ${notes ? `<div class="notes"><strong>Notes</strong><br/>${notes}</div>` : ""}
     const user = sessionData.session?.user;
     if (!user) return;
 
-    // Ensure business profile exists and get its id
-    await saveProfileSilently();
-    const { data: profile } = await supabase
-      .from("invoice_business_profiles")
-      .select("id")
-      .eq("user_id", user.id)
-      .limit(1)
-      .single();
-    const businessProfileId: string | null = profile?.id ?? null;
+    // Ensure business profile exists and get its id in one operation
+    const businessProfileId = await saveProfileSilently();
+    if (!businessProfileId) {
+      throw new Error("Could not create or find business profile — check Supabase invoice_business_profiles RLS policies");
+    }
 
     // Get or create client, updating email if it changed
     let clientId: string | null = null;
